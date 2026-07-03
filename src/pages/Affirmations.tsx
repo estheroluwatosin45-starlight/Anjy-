@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { getAffirmations } from '@/lib/storage';
 import { Affirmation } from '@/types';
 
 export function Affirmations() {
@@ -10,19 +10,14 @@ export function Affirmations() {
 
   useEffect(() => {
     async function fetchAffirmations() {
-      if (!supabase) {
-        setLoading(false);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('affirmations')
-        .select('*')
-        .order('display_date', { ascending: false });
-      
-      if (!error && data) {
+      try {
+        const data = await getAffirmations();
         setAffirmations(data);
+      } catch (error) {
+        console.error('Error fetching affirmations:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchAffirmations();
   }, []);
@@ -31,10 +26,10 @@ export function Affirmations() {
     <div className="flex-grow bg-transparent py-16 px-4 flex flex-col items-center">
       <div className="max-w-3xl w-full">
         <header className="mb-12 text-center">
-          <div className="w-16 h-16 bg-[#E9D5FF] rounded-full flex items-center justify-center mx-auto mb-6 text-[#6D28D9]">
+          <div className="w-16 h-16 bg-[#E9D5FF] dark:bg-purple-900/50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#6D28D9] dark:text-[#A78BFA]">
             <Sparkles className="w-8 h-8" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-[#4C1D95] mb-4">Daily Affirmations</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-[#4C1D95] dark:text-purple-400 mb-4">Daily Affirmations</h1>
           <p className="text-gray-600 dark:text-gray-400 text-lg">
             Start your day with a positive mindset.
           </p>
@@ -44,7 +39,7 @@ export function Affirmations() {
           {loading ? (
              <div className="text-center py-20 text-gray-500">Loading affirmations...</div>
           ) : affirmations.length === 0 ? (
-            <div className="text-center py-20 bg-white dark:bg-gray-800 dark:border-gray-700 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="text-center py-20 bg-white dark:bg-gray-800 dark:border-gray-700 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
                <p className="text-gray-500 mb-2">No affirmations published yet.</p>
                <p className="text-sm text-gray-400">Check back later for today's affirmation.</p>
             </div>
@@ -65,7 +60,7 @@ export function Affirmations() {
                       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
                     })}
                   </p>
-                  <h3 className="text-3xl md:text-4xl font-semibold leading-tight">
+                  <h3 className="text-3xl md:text-4xl font-semibold leading-tight font-light">
                     "{affirmation.affirmation_text}"
                   </h3>
                 </div>

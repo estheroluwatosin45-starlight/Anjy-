@@ -88,7 +88,25 @@ create policy "Admin can insert poems" on poems for insert with check (auth.role
 create policy "Admin can update poems" on poems for update using (auth.role() = 'authenticated');
 create policy "Admin can delete poems" on poems for delete using (auth.role() = 'authenticated');
 
--- (Replicate Admin policies for other tables as needed)
+create policy "Admin can insert diary entries" on diary_entries for insert with check (auth.role() = 'authenticated');
+create policy "Admin can update diary entries" on diary_entries for update using (auth.role() = 'authenticated');
+create policy "Admin can delete diary entries" on diary_entries for delete using (auth.role() = 'authenticated');
+
+create policy "Admin can insert bible verses" on bible_verses for insert with check (auth.role() = 'authenticated');
+create policy "Admin can update bible verses" on bible_verses for update using (auth.role() = 'authenticated');
+create policy "Admin can delete bible verses" on bible_verses for delete using (auth.role() = 'authenticated');
+
+create policy "Admin can insert affirmations" on affirmations for insert with check (auth.role() = 'authenticated');
+create policy "Admin can update affirmations" on affirmations for update using (auth.role() = 'authenticated');
+create policy "Admin can delete affirmations" on affirmations for delete using (auth.role() = 'authenticated');
+
+-- NOTE: If you are not using Supabase Auth (e.g. logging in only via the local "admin123" passcode),
+-- you can enable public inserts for simplicity by running these alternative policies in the Supabase SQL editor:
+--
+-- create policy "Public can insert poems" on poems for insert with check (true);
+-- create policy "Public can insert diary entries" on diary_entries for insert with check (true);
+-- create policy "Public can insert bible verses" on bible_verses for insert with check (true);
+-- create policy "Public can insert affirmations" on affirmations for insert with check (true);
 
 -- Anyone can submit contact messages and subscribe to newsletter
 create policy "Public can insert contact messages" on contact_messages for insert with check (true);

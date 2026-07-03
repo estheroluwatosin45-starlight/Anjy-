@@ -1,31 +1,32 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Search } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { getPoems } from '@/lib/storage';
 import { Poem } from '@/types';
 
 export function Poems() {
   const [poems, setPoems] = useState<Poem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     async function fetchPoems() {
-      if (!supabase) {
-        setLoading(false);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('poems')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
+      try {
+        const data = await getPoems();
         setPoems(data);
+      } catch (error) {
+        console.error('Error fetching poems:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchPoems();
   }, []);
+
+  const filteredPoems = poems.filter(poem => 
+    poem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    poem.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex-grow bg-transparent py-16 px-4">
@@ -41,6 +42,8 @@ export function Poems() {
           <input 
             type="text" 
             placeholder="Search poems..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-4 rounded-full bg-white dark:bg-gray-800 dark:border-gray-700 shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#A78BFA] text-[#1F2937] dark:text-gray-100"
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -49,13 +52,13 @@ export function Poems() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {loading ? (
              <div className="col-span-full text-center py-20 text-gray-500">Loading poems...</div>
-          ) : poems.length === 0 ? (
+          ) : filteredPoems.length === 0 ? (
             <div className="col-span-full text-center py-20 bg-white dark:bg-gray-800 dark:border-gray-700 rounded-2xl border border-gray-100 shadow-sm">
-               <p className="text-gray-500 mb-2">No poems published yet.</p>
-               <p className="text-sm text-gray-400">Check back later for new verses.</p>
+               <p className="text-gray-500 mb-2">No poems found.</p>
+               <p className="text-sm text-gray-400">Try searching for another keyword or check back later.</p>
             </div>
           ) : (
-            poems.map((poem) => (
+            filteredPoems.map((poem) => (
               <motion.div 
                 key={poem.id}
                 whileHover={{ y: -5 }}
@@ -66,7 +69,7 @@ export function Poems() {
                 )}
                 <div className="p-8 flex-grow flex flex-col">
                   <h3 className="text-2xl font-semibold text-[#1F2937] dark:text-gray-100 mb-4">{poem.title}</h3>
-                  <div className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap mb-6 flex-grow font-serif leading-relaxed line-clamp-4">
+                  <div className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap mb-6 flex-grow font-serif leading-relaxed line-clamp-4 font-light">
                     {poem.content}
                   </div>
                   <div className="text-sm text-gray-400 mt-auto">
