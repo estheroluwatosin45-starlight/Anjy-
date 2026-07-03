@@ -1,7 +1,14 @@
 import { supabase } from './supabase';
 import { Poem, DiaryEntry, BibleVerse, Affirmation } from '../types';
 
-// Helper to generate UUIDs locally when Supabase is not connected
+export const STORAGE_KEYS = {
+  POEMS: 'anjy_local_poems',
+  DIARY: 'anjy_local_diary_entries',
+  VERSES: 'anjy_local_bible_verses',
+  AFFIRMATIONS: 'anjy_local_affirmations',
+};
+
+// Helper to generate UUIDs locally when Supabase is not connected or offline
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
@@ -9,14 +16,6 @@ function generateUUID() {
     return v.toString(16);
   });
 }
-
-// Local Storage Keys
-export const STORAGE_KEYS = {
-  POEMS: 'anjy_local_poems',
-  DIARY: 'anjy_local_diary_entries',
-  VERSES: 'anjy_local_bible_verses',
-  AFFIRMATIONS: 'anjy_local_affirmations',
-};
 
 // Generic LocalStorage helpers
 export function getLocal<T>(key: string): T[] {
@@ -31,33 +30,73 @@ function saveLocal<T>(key: string, item: T): T {
   return item;
 }
 
+function getPasscode(): string {
+  return localStorage.getItem('anjy_passcode') || '';
+}
+
+function getLoginMethod(): string {
+  return localStorage.getItem('anjy_login_method') || 'local';
+}
+
+function isOnline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine;
+}
+
 // --- Poems ---
 export async function getPoems(): Promise<Poem[]> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('poems')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) return data;
-    console.warn('Failed to fetch poems from Supabase, returning local storage fallback:', error);
+  if (supabase && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('poems')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Network error fetching poems, falling back to local storage:', err);
+    }
   }
   return getLocal<Poem>(STORAGE_KEYS.POEMS);
 }
 
 export async function savePoem(poem: Omit<Poem, 'id' | 'created_at' | 'slug'>): Promise<{ data: Poem | null; error: any }> {
-  if (supabase) {
-    const slug = poem.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const { data, error } = await supabase
-      .from('poems')
-      .insert([{ ...poem, slug }])
-      .select()
-      .single();
-    if (!error) return { data, error: null };
-    return { data: null, error };
+  const slug = poem.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+  // 1. Direct Supabase Auth writing
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('poems')
+        .insert([{ ...poem, slug }])
+        .select()
+        .single();
+      if (!error) return { data, error: null };
+      return { data: null, error };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
   }
 
-  // Local fallback
-  const slug = poem.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  // 2. Option C: Express API proxy writing (using passcode)
+  if (isOnline()) {
+    try {
+      const response = await fetch('/api/admin/poems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...poem, passcode: getPasscode() })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.data) {
+        return { data: resData.data, error: null };
+      }
+      if (response.status === 401) {
+        return { data: null, error: { message: 'Invalid admin passcode' } };
+      }
+    } catch (err: any) {
+      console.warn('Network error saving poem to backend, falling back to local storage:', err);
+    }
+  }
+
+  // 3. Offline Local storage fallback
   const localPoem: Poem = {
     id: generateUUID(),
     created_at: new Date().toISOString(),
@@ -70,30 +109,56 @@ export async function savePoem(poem: Omit<Poem, 'id' | 'created_at' | 'slug'>): 
 
 // --- Diary Entries ---
 export async function getDiaryEntries(): Promise<DiaryEntry[]> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('diary_entries')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) return data;
-    console.warn('Failed to fetch diary entries from Supabase:', error);
+  if (supabase && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Network error fetching diary entries, falling back to local storage:', err);
+    }
   }
   return getLocal<DiaryEntry>(STORAGE_KEYS.DIARY);
 }
 
 export async function saveDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'created_at' | 'slug'>): Promise<{ data: DiaryEntry | null; error: any }> {
-  if (supabase) {
-    const slug = entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const { data, error } = await supabase
-      .from('diary_entries')
-      .insert([{ ...entry, slug }])
-      .select()
-      .single();
-    if (!error) return { data, error: null };
-    return { data: null, error };
+  const slug = entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .insert([{ ...entry, slug }])
+        .select()
+        .single();
+      if (!error) return { data, error: null };
+      return { data: null, error };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
   }
 
-  const slug = entry.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  if (isOnline()) {
+    try {
+      const response = await fetch('/api/admin/diary_entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...entry, passcode: getPasscode() })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.data) {
+        return { data: resData.data, error: null };
+      }
+      if (response.status === 401) {
+        return { data: null, error: { message: 'Invalid admin passcode' } };
+      }
+    } catch (err: any) {
+      console.warn('Network error saving diary entry to backend, falling back to local storage:', err);
+    }
+  }
+
   const localEntry: DiaryEntry = {
     id: generateUUID(),
     created_at: new Date().toISOString(),
@@ -106,26 +171,52 @@ export async function saveDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'created_at'
 
 // --- Bible Verses ---
 export async function getBibleVerses(): Promise<BibleVerse[]> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('bible_verses')
-      .select('*')
-      .order('display_date', { ascending: false });
-    if (!error && data) return data;
-    console.warn('Failed to fetch bible verses from Supabase:', error);
+  if (supabase && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('bible_verses')
+        .select('*')
+        .order('display_date', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Network error fetching bible verses, falling back to local storage:', err);
+    }
   }
   return getLocal<BibleVerse>(STORAGE_KEYS.VERSES);
 }
 
 export async function saveBibleVerse(verse: Omit<BibleVerse, 'id'>): Promise<{ data: BibleVerse | null; error: any }> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('bible_verses')
-      .insert([verse])
-      .select()
-      .single();
-    if (!error) return { data, error: null };
-    return { data: null, error };
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('bible_verses')
+        .insert([verse])
+        .select()
+        .single();
+      if (!error) return { data, error: null };
+      return { data: null, error };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  }
+
+  if (isOnline()) {
+    try {
+      const response = await fetch('/api/admin/bible_verses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...verse, passcode: getPasscode() })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.data) {
+        return { data: resData.data, error: null };
+      }
+      if (response.status === 401) {
+        return { data: null, error: { message: 'Invalid admin passcode' } };
+      }
+    } catch (err: any) {
+      console.warn('Network error saving bible verse to backend, falling back to local storage:', err);
+    }
   }
 
   const localVerse: BibleVerse = {
@@ -138,26 +229,52 @@ export async function saveBibleVerse(verse: Omit<BibleVerse, 'id'>): Promise<{ d
 
 // --- Affirmations ---
 export async function getAffirmations(): Promise<Affirmation[]> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('affirmations')
-      .select('*')
-      .order('display_date', { ascending: false });
-    if (!error && data) return data;
-    console.warn('Failed to fetch affirmations from Supabase:', error);
+  if (supabase && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('affirmations')
+        .select('*')
+        .order('display_date', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Network error fetching affirmations, falling back to local storage:', err);
+    }
   }
   return getLocal<Affirmation>(STORAGE_KEYS.AFFIRMATIONS);
 }
 
 export async function saveAffirmation(affirmation: Omit<Affirmation, 'id'>): Promise<{ data: Affirmation | null; error: any }> {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('affirmations')
-      .insert([affirmation])
-      .select()
-      .single();
-    if (!error) return { data, error: null };
-    return { data: null, error };
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('affirmations')
+        .insert([affirmation])
+        .select()
+        .single();
+      if (!error) return { data, error: null };
+      return { data: null, error };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  }
+
+  if (isOnline()) {
+    try {
+      const response = await fetch('/api/admin/affirmations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...affirmation, passcode: getPasscode() })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.data) {
+        return { data: resData.data, error: null };
+      }
+      if (response.status === 401) {
+        return { data: null, error: { message: 'Invalid admin passcode' } };
+      }
+    } catch (err: any) {
+      console.warn('Network error saving affirmation to backend, falling back to local storage:', err);
+    }
   }
 
   const localAffirmation: Affirmation = {

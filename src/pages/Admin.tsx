@@ -600,6 +600,8 @@ export function Admin() {
     if (supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
+          localStorage.setItem('anjy_login_method', 'supabase');
+          localStorage.removeItem('anjy_passcode');
           setIsAuthenticated(true);
           setLoginMethod('supabase');
         }
@@ -637,6 +639,8 @@ export function Admin() {
 
     if (loginMethod === 'local') {
       if (password === 'admin123') {
+        localStorage.setItem('anjy_login_method', 'local');
+        localStorage.setItem('anjy_passcode', password);
         setIsAuthenticated(true);
         setLoading(false);
       } else {
@@ -657,6 +661,8 @@ export function Admin() {
         if (error) {
           setAuthError(error.message);
         } else if (data.session) {
+          localStorage.setItem('anjy_login_method', 'supabase');
+          localStorage.removeItem('anjy_passcode');
           setIsAuthenticated(true);
         }
       } catch (err: any) {
@@ -671,6 +677,8 @@ export function Admin() {
     if (loginMethod === 'supabase' && supabase) {
       await supabase.auth.signOut();
     }
+    localStorage.removeItem('anjy_login_method');
+    localStorage.removeItem('anjy_passcode');
     setIsAuthenticated(false);
     setEmail('');
     setPassword('');
