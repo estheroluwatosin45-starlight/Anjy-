@@ -173,6 +173,180 @@ app.post('/api/backup', async (req, res) => {
   }
 });
 
+// --- Admin Database Operations (Option C) ---
+
+const verifyAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const passcode = req.body.passcode || req.query.passcode || req.headers['x-admin-passcode'];
+  if (passcode !== (process.env.ADMIN_PASSCODE || 'admin123')) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid passcode' });
+  }
+  next();
+};
+
+// Create Poem
+app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
+  try {
+    const { title, content, featured_image } = req.body;
+    if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const { data, error } = await supabase
+      .from('poems')
+      .insert([{ title, content, featured_image, slug }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message, details: error });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error creating poem:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create Diary Entry
+app.post('/api/admin/diary_entries', verifyAdmin, async (req, res) => {
+  try {
+    const { title, content, mood } = req.body;
+    if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const { data, error } = await supabase
+      .from('diary_entries')
+      .insert([{ title, content, mood, slug }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message, details: error });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error creating diary entry:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create Bible Verse
+app.post('/api/admin/bible_verses', verifyAdmin, async (req, res) => {
+  try {
+    const { verse_reference, verse_text, explanation, display_date } = req.body;
+    if (!verse_reference || !verse_text || !display_date) {
+      return res.status(400).json({ error: 'Reference, text, and display date are required' });
+    }
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { data, error } = await supabase
+      .from('bible_verses')
+      .insert([{ verse_reference, verse_text, explanation, display_date }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message, details: error });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error creating bible verse:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create Affirmation
+app.post('/api/admin/affirmations', verifyAdmin, async (req, res) => {
+  try {
+    const { title, affirmation_text, display_date } = req.body;
+    if (!affirmation_text || !display_date) {
+      return res.status(400).json({ error: 'Affirmation text and display date are required' });
+    }
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { data, error } = await supabase
+      .from('affirmations')
+      .insert([{ title: title || 'Daily Affirmation', affirmation_text, display_date }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message, details: error });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error creating affirmation:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get Contact Messages
+app.get('/api/admin/contact_messages', verifyAdmin, async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error fetching contact messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete Contact Message
+app.delete('/api/admin/contact_messages/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { error } = await supabase
+      .from('contact_messages')
+      .delete()
+      .eq('id', id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting contact message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get Newsletter Subscribers
+app.get('/api/admin/newsletter_subscribers', verifyAdmin, async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { data, error } = await supabase
+      .from('newsletter_subscribers')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('Error fetching subscribers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete Newsletter Subscriber
+app.delete('/api/admin/newsletter_subscribers/:id', verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const { error } = await supabase
+      .from('newsletter_subscribers')
+      .delete()
+      .eq('id', id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting subscriber:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // --- Server Startup or Export ---
 
 const startServer = async () => {

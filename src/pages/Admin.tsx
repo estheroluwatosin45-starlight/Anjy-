@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Lock, ShieldAlert, Sparkles, MessageCircle, PenTool, CheckCircle, Image as ImageIcon, Send, Mail, Download, Key } from 'lucide-react';
+import { Lock, ShieldAlert, Sparkles, MessageCircle, PenTool, CheckCircle, Image as ImageIcon, Send, Mail, Download, Key, Users } from 'lucide-react';
 import { 
   savePoem, 
   saveDiaryEntry, 
@@ -10,7 +10,11 @@ import {
   getPoems, 
   getDiaryEntries, 
   getBibleVerses, 
-  getAffirmations 
+  getAffirmations,
+  getContactMessages,
+  deleteContactMessage,
+  getNewsletterSubscribers,
+  deleteNewsletterSubscriber
 } from '@/lib/storage';
 
 // --- Tab Components ---
@@ -583,6 +587,181 @@ function BackupTab({ isLocalMode }: BackupTabProps) {
 }
 
 
+function InboxTab({ onAction }: { onAction?: () => void }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const data = await getContactMessages();
+      setMessages(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+    setDeletingId(id);
+    try {
+      const success = await deleteContactMessage(id);
+      if (success) {
+        setMessages(messages.filter(m => m.id !== id));
+        if (onAction) onAction();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) return <div className="text-center py-20 text-gray-500">Loading messages...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2 text-[#4C1D95] dark:text-purple-400">
+          <Mail className="text-[#6D28D9] w-6 h-6" /> Contact Inbox
+        </h2>
+        <span className="text-xs font-semibold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-200 px-2.5 py-1 rounded-full">
+          {messages.length} Messages
+        </span>
+      </div>
+
+      {messages.length === 0 ? (
+        <div className="text-center py-20 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-gray-400">
+          <Mail className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#6D28D9]" />
+          <p>Inbox is empty. No messages submitted yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {messages.map((msg) => (
+            <div key={msg.id} className="p-5 border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1.5 flex-grow">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">{msg.name}</span>
+                  <span className="text-xs text-purple-600 dark:text-purple-400 font-mono bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded">{msg.email}</span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed">
+                  {msg.message}
+                </p>
+                <small className="text-xs text-gray-400 block pt-1">
+                  Received: {new Date(msg.created_at).toLocaleString()}
+                </small>
+              </div>
+              <button 
+                onClick={() => handleDelete(msg.id)}
+                disabled={deletingId === msg.id}
+                className="px-3.5 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              >
+                {deletingId === msg.id ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubscribersTab({ onAction }: { onAction?: () => void }) {
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchSubscribers = async () => {
+    setLoading(true);
+    try {
+      const data = await getNewsletterSubscribers();
+      setSubscribers(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscribers();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this subscriber?')) return;
+    setDeletingId(id);
+    try {
+      const success = await deleteNewsletterSubscriber(id);
+      if (success) {
+        setSubscribers(subscribers.filter(s => s.id !== id));
+        if (onAction) onAction();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) return <div className="text-center py-20 text-gray-500">Loading subscribers...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2 text-[#4C1D95] dark:text-purple-400">
+          <Users className="text-[#6D28D9] w-6 h-6" /> Newsletter Subscribers
+        </h2>
+        <span className="text-xs font-semibold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-200 px-2.5 py-1 rounded-full">
+          {subscribers.length} Subscribers
+        </span>
+      </div>
+
+      {subscribers.length === 0 ? (
+        <div className="text-center py-20 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-gray-400">
+          <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#6D28D9]" />
+          <p>No newsletter subscribers yet.</p>
+        </div>
+      ) : (
+        <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
+          <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+              <tr>
+                <th className="px-6 py-3 font-semibold">Email Address</th>
+                <th className="px-6 py-3 font-semibold">Subscribed Date</th>
+                <th className="px-6 py-3 text-right font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-850">
+              {subscribers.map((sub) => (
+                <tr key={sub.id} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                  <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200">{sub.email}</td>
+                  <td className="px-6 py-4">{new Date(sub.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => handleDelete(sub.id)}
+                      disabled={deletingId === sub.id}
+                      className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      {deletingId === sub.id ? 'Removing...' : 'Remove'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Admin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -593,7 +772,7 @@ export function Admin() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('Dashboard');
 
-  const [counts, setCounts] = useState({ poems: 0, diaryEntries: 0, verses: 0, affirmations: 0 });
+  const [counts, setCounts] = useState({ poems: 0, diaryEntries: 0, verses: 0, affirmations: 0, messages: 0, subscribers: 0 });
 
   // Auto sign in if session exists in Supabase
   useEffect(() => {
@@ -615,11 +794,15 @@ export function Admin() {
       const d = await getDiaryEntries();
       const v = await getBibleVerses();
       const a = await getAffirmations();
+      const m = await getContactMessages();
+      const s = await getNewsletterSubscribers();
       setCounts({
         poems: p.length,
         diaryEntries: d.length,
         verses: v.length,
-        affirmations: a.length
+        affirmations: a.length,
+        messages: m.length,
+        subscribers: s.length
       });
     } catch (err) {
       console.error('Error fetching dashboard counts:', err);
@@ -782,6 +965,10 @@ export function Admin() {
         return <BibleVerseGenerator onPublishSuccess={fetchCounts} />;
       case 'Affirmations':
         return <AffirmationGenerator onPublishSuccess={fetchCounts} />;
+      case 'Inbox':
+        return <InboxTab onAction={fetchCounts} />;
+      case 'Subscribers':
+        return <SubscribersTab onAction={fetchCounts} />;
       case 'AI Assistant':
         return <AIChatTab />;
       case 'Backups & Exporters':
@@ -792,7 +979,7 @@ export function Admin() {
             <h2 className="text-xl font-semibold mb-2">Welcome to ANJY CMS</h2>
             <p className="text-gray-500 mb-8 text-sm">Select a category on the left to start managing and creating content.</p>
             
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
                 <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Poems</p>
                 <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.poems}</p>
@@ -808,6 +995,14 @@ export function Admin() {
               <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
                 <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Affirmations</p>
                 <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.affirmations}</p>
+              </div>
+              <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Inbox Messages</p>
+                <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.messages}</p>
+              </div>
+              <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Subscribers</p>
+                <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.subscribers}</p>
               </div>
             </div>
             
@@ -857,15 +1052,29 @@ export function Admin() {
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1 space-y-2">
-            {['Dashboard', 'Poems', 'Diary Entries', 'Bible Verses', 'Affirmations', 'AI Assistant', 'Backups & Exporters'].map((tab) => (
+            {['Dashboard', 'Poems', 'Diary Entries', 'Bible Verses', 'Affirmations', 'Inbox', 'Subscribers', 'AI Assistant', 'Backups & Exporters'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`w-full text-left px-4 py-3 rounded-lg shadow-sm border font-medium transition-colors ${activeTab === tab ? 'bg-[#6D28D9] text-white border-[#6D28D9]' : 'bg-white dark:bg-gray-800 dark:border-gray-700 border-gray-100 text-[#1F2937] dark:text-gray-100 hover:bg-[#E9D5FF]/20'}`}
+                className={`w-full text-left px-4 py-3 rounded-lg shadow-sm border font-medium transition-colors flex items-center justify-between ${activeTab === tab ? 'bg-[#6D28D9] text-white border-[#6D28D9]' : 'bg-white dark:bg-gray-800 dark:border-gray-700 border-gray-100 text-[#1F2937] dark:text-gray-100 hover:bg-[#E9D5FF]/20'}`}
               >
-                {tab === 'AI Assistant' && <Sparkles className="inline w-4 h-4 mr-2" />}
-                {tab === 'Backups & Exporters' && <Mail className="inline w-4 h-4 mr-2" />}
-                {tab}
+                <span className="flex items-center">
+                  {tab === 'AI Assistant' && <Sparkles className="inline w-4 h-4 mr-2" />}
+                  {tab === 'Backups & Exporters' && <Mail className="inline w-4 h-4 mr-2" />}
+                  {tab === 'Inbox' && <Mail className="inline w-4 h-4 mr-2" />}
+                  {tab === 'Subscribers' && <Users className="inline w-4 h-4 mr-2" />}
+                  {tab}
+                </span>
+                {tab === 'Inbox' && counts.messages > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === tab ? 'bg-white text-purple-900' : 'bg-purple-100 text-purple-800'}`}>
+                    {counts.messages}
+                  </span>
+                )}
+                {tab === 'Subscribers' && counts.subscribers > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeTab === tab ? 'bg-white text-purple-900' : 'bg-purple-100 text-purple-800'}`}>
+                    {counts.subscribers}
+                  </span>
+                )}
               </button>
             ))}
           </div>

@@ -6,6 +6,8 @@ export const STORAGE_KEYS = {
   DIARY: 'anjy_local_diary_entries',
   VERSES: 'anjy_local_bible_verses',
   AFFIRMATIONS: 'anjy_local_affirmations',
+  MESSAGES: 'anjy_local_contact_messages',
+  SUBSCRIBERS: 'anjy_local_newsletter_subscribers',
 };
 
 // Helper to generate UUIDs locally when Supabase is not connected or offline
@@ -292,6 +294,8 @@ export function exportLocalData() {
     diaryEntries: getLocal<DiaryEntry>(STORAGE_KEYS.DIARY),
     bibleVerses: getLocal<BibleVerse>(STORAGE_KEYS.VERSES),
     affirmations: getLocal<Affirmation>(STORAGE_KEYS.AFFIRMATIONS),
+    contactMessages: getLocal<any>(STORAGE_KEYS.MESSAGES),
+    newsletterSubscribers: getLocal<any>(STORAGE_KEYS.SUBSCRIBERS),
   };
   const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
   const downloadAnchor = document.createElement('a');
@@ -300,4 +304,177 @@ export function exportLocalData() {
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
+}
+
+// --- Contact Messages ---
+export async function getContactMessages(): Promise<any[]> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('contact_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Error direct-fetching contact messages:', err);
+    }
+  }
+
+  if (getLoginMethod() === 'local' && isOnline()) {
+    try {
+      const response = await fetch(`/api/admin/contact_messages?passcode=${getPasscode()}`);
+      const resData = await response.json();
+      if (response.ok && resData.data) return resData.data;
+    } catch (err) {
+      console.warn('Error fetching contact messages from backend:', err);
+    }
+  }
+
+  return getLocal<any>(STORAGE_KEYS.MESSAGES);
+}
+
+export async function deleteContactMessage(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .delete()
+        .eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  if (getLoginMethod() === 'local' && isOnline()) {
+    try {
+      const response = await fetch(`/api/admin/contact_messages/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: getPasscode() })
+      });
+      if (response.ok) return true;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  // Local fallback
+  const list = getLocal<any>(STORAGE_KEYS.MESSAGES);
+  const updated = list.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(updated));
+  return true;
+}
+
+export async function sendContactMessage(name: string, email: string, message: string): Promise<boolean> {
+  if (supabase && isOnline()) {
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .insert([{ name, email, message }]);
+      if (!error) return true;
+    } catch (err) {
+      console.warn('Failed to send contact message via Supabase, saving locally:', err);
+    }
+  }
+
+  // Local save
+  const localMessage = {
+    id: generateUUID(),
+    created_at: new Date().toISOString(),
+    name,
+    email,
+    message
+  };
+  saveLocal<any>(STORAGE_KEYS.MESSAGES, localMessage);
+  return true;
+}
+
+// --- Newsletter Subscribers ---
+export async function getNewsletterSubscribers(): Promise<any[]> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('newsletter_subscribers')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Error direct-fetching subscribers:', err);
+    }
+  }
+
+  if (getLoginMethod() === 'local' && isOnline()) {
+    try {
+      const response = await fetch(`/api/admin/newsletter_subscribers?passcode=${getPasscode()}`);
+      const resData = await response.json();
+      if (response.ok && resData.data) return resData.data;
+    } catch (err) {
+      console.warn('Error fetching subscribers from backend:', err);
+    }
+  }
+
+  return getLocal<any>(STORAGE_KEYS.SUBSCRIBERS);
+}
+
+export async function deleteNewsletterSubscriber(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase
+        .from('newsletter_subscribers')
+        .delete()
+        .eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  if (getLoginMethod() === 'local' && isOnline()) {
+    try {
+      const response = await fetch(`/api/admin/newsletter_subscribers/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: getPasscode() })
+      });
+      if (response.ok) return true;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  const list = getLocal<any>(STORAGE_KEYS.SUBSCRIBERS);
+  const updated = list.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.SUBSCRIBERS, JSON.stringify(updated));
+  return true;
+}
+
+export async function subscribeToNewsletter(email: string): Promise<{ success: boolean; error?: string }> {
+  if (supabase && isOnline()) {
+    try {
+      const { error } = await supabase
+        .from('newsletter_subscribers')
+        .insert([{ email }]);
+      if (!error) return { success: true };
+      if (error.code === '23505') { // Unique constraint violation
+        return { success: false, error: 'You are already subscribed!' };
+      }
+      return { success: false, error: error.message };
+    } catch (err: any) {
+      console.warn('Failed to subscribe via Supabase, saving locally:', err);
+    }
+  }
+
+  const list = getLocal<any>(STORAGE_KEYS.SUBSCRIBERS);
+  if (list.some(item => item.email === email)) {
+    return { success: false, error: 'You are already subscribed!' };
+  }
+
+  const localSubscriber = {
+    id: generateUUID(),
+    created_at: new Date().toISOString(),
+    email
+  };
+  saveLocal<any>(STORAGE_KEYS.SUBSCRIBERS, localSubscriber);
+  return { success: true };
 }

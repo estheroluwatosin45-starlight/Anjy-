@@ -111,3 +111,10 @@ create policy "Admin can delete affirmations" on affirmations for delete using (
 -- Anyone can submit contact messages and subscribe to newsletter
 create policy "Public can insert contact messages" on contact_messages for insert with check (true);
 create policy "Public can insert newsletter subscribers" on newsletter_subscribers for insert with check (true);
+
+-- Authenticated users (Admin) can view and manage contact messages and subscribers
+create policy "Admin can view contact messages" on contact_messages for select using (auth.role() = 'authenticated');
+create policy "Admin can delete contact messages" on contact_messages for delete using (auth.role() = 'authenticated');
+
+create policy "Admin can view newsletter subscribers" on newsletter_subscribers for select using (auth.role() = 'authenticated');
+create policy "Admin can delete newsletter subscribers" on newsletter_subscribers for delete using (auth.role() = 'authenticated');
