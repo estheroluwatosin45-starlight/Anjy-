@@ -765,7 +765,7 @@ function SubscribersTab({ onAction }: { onAction?: () => void }) {
 export function Admin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'supabase' | 'local'>(supabase ? 'supabase' : 'local');
+  const [loginMethod] = useState<'supabase' | 'local'>('local');
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -774,17 +774,12 @@ export function Admin() {
 
   const [counts, setCounts] = useState({ poems: 0, diaryEntries: 0, verses: 0, affirmations: 0, messages: 0, subscribers: 0 });
 
-  // Auto sign in if session exists in Supabase
+  // Auto sign in if passcode exists locally
   useEffect(() => {
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          localStorage.setItem('anjy_login_method', 'supabase');
-          localStorage.removeItem('anjy_passcode');
-          setIsAuthenticated(true);
-          setLoginMethod('supabase');
-        }
-      });
+    const cachedPasscode = localStorage.getItem('anjy_passcode');
+    const cachedMethod = localStorage.getItem('anjy_login_method');
+    if (cachedMethod === 'local' && cachedPasscode === 'admin123') {
+      setIsAuthenticated(true);
     }
   }, []);
 
@@ -820,46 +815,18 @@ export function Admin() {
     setAuthError('');
     setLoading(true);
 
-    if (loginMethod === 'local') {
-      if (password === 'admin123') {
-        localStorage.setItem('anjy_login_method', 'local');
-        localStorage.setItem('anjy_passcode', password);
-        setIsAuthenticated(true);
-        setLoading(false);
-      } else {
-        setAuthError('Invalid local passcode. (Hint: use admin123)');
-        setLoading(false);
-      }
+    if (password === 'admin123') {
+      localStorage.setItem('anjy_login_method', 'local');
+      localStorage.setItem('anjy_passcode', password);
+      setIsAuthenticated(true);
+      setLoading(false);
     } else {
-      if (!supabase) {
-        setAuthError('Supabase is not connected. Use Local Mode instead.');
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (error) {
-          setAuthError(error.message);
-        } else if (data.session) {
-          localStorage.setItem('anjy_login_method', 'supabase');
-          localStorage.removeItem('anjy_passcode');
-          setIsAuthenticated(true);
-        }
-      } catch (err: any) {
-        setAuthError(err.message || 'Failed to authenticate');
-      } finally {
-        setLoading(false);
-      }
+      setAuthError('Invalid passcode. (Hint: use admin123)');
+      setLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    if (loginMethod === 'supabase' && supabase) {
-      await supabase.auth.signOut();
-    }
     localStorage.removeItem('anjy_login_method');
     localStorage.removeItem('anjy_passcode');
     setIsAuthenticated(false);
@@ -876,27 +843,7 @@ export function Admin() {
             <Lock className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-[#1F2937] dark:text-gray-100 mb-2 text-center">Admin Access</h1>
-          <p className="text-gray-500 text-sm mb-6 text-center">Please sign in to manage ANJY.</p>
-
-          {/* Mode Switcher if Supabase is connected */}
-          {supabase && (
-            <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl mb-6 text-sm">
-              <button 
-                type="button"
-                onClick={() => { setLoginMethod('supabase'); setAuthError(''); }}
-                className={`flex-grow py-2 rounded-lg font-medium transition-colors ${loginMethod === 'supabase' ? 'bg-white dark:bg-gray-800 text-purple-900 dark:text-white shadow-sm' : 'text-gray-500'}`}
-              >
-                Supabase Auth
-              </button>
-              <button 
-                type="button"
-                onClick={() => { setLoginMethod('local'); setAuthError(''); }}
-                className={`flex-grow py-2 rounded-lg font-medium transition-colors ${loginMethod === 'local' ? 'bg-white dark:bg-gray-800 text-purple-900 dark:text-white shadow-sm' : 'text-gray-500'}`}
-              >
-                Local Offline Mode
-              </button>
-            </div>
-          )}
+          <p className="text-gray-500 text-sm mb-6 text-center">Please enter passcode to manage ANJY.</p>
 
           {authError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg mb-4 flex items-center gap-1.5 font-medium leading-relaxed">
@@ -906,30 +853,16 @@ export function Admin() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {loginMethod === 'supabase' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  placeholder="admin@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
-                  required
-                />
-              </div>
-            )}
-            
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">
-                {loginMethod === 'local' ? 'Admin Passcode' : 'Password'}
+                Admin Passcode
               </label>
               <input 
                 type="password" 
-                placeholder={loginMethod === 'local' ? 'Enter admin passcode' : 'Enter account password'}
+                placeholder="Enter admin passcode"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
                 required
               />
             </div>
@@ -942,14 +875,6 @@ export function Admin() {
               {loading ? 'Signing In...' : <><Key className="w-4 h-4" /> Sign In</>}
             </button>
           </form>
-
-          {!supabase && (
-            <div className="mt-6 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl text-center">
-              <p className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1 font-medium">
-                <ShieldAlert className="w-3.5 h-3.5" /> Supabase is not connected. Local Storage Mode enabled. Passcode: admin123
-              </p>
-            </div>
-          )}
         </div>
       </div>
     );
