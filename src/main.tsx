@@ -8,3 +8,11 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// Fade out and remove preloader once React is fully loaded and mounted
+const preloader = document.getElementById('preloader');
+if (preloader) {
+  preloader.classList.add('preloader-fade-out');
+  setTimeout(() => preloader.remove(), 600);
+}
+
