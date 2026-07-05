@@ -70,7 +70,7 @@ export function Navbar() {
           <ButterflyIcon className="w-12 h-12 md:w-14 md:h-14 text-purple-600 dark:text-[#FDE68A] dark:drop-shadow-[0_0_8px_rgba(253,230,138,0.5)] group-hover:scale-105 transition-transform" />
           <div className="flex flex-col -gap-1">
             <span className="text-2xl md:text-3xl leading-none font-serif font-bold text-purple-900 dark:text-white tracking-wider">ANJY</span>
-            <span className="text-purple-500 dark:text-[#FDE68A] font-script text-sm md:text-base tracking-wide mt-1 dark:drop-shadow-[0_0_2px_rgba(253,230,138,0.4)]">Write. Reflect. Grow.</span>
+            <span className="hidden sm:inline text-purple-500 dark:text-[#FDE68A] font-script text-sm md:text-base tracking-wide mt-1 dark:drop-shadow-[0_0_2px_rgba(253,230,138,0.4)]">Write. Reflect. Grow.</span>
           </div>
         </Link>
 
@@ -123,9 +123,9 @@ export function Navbar() {
           </button>
           <Link 
             to="/admin" 
-            className="bg-gradient-to-r from-[#d946ef] to-[#a855f7] hover:from-[#e879f9] hover:to-[#c084fc] text-white px-4 xl:px-5 py-2 xl:py-2.5 rounded-full hidden md:flex items-center gap-2 text-xs xl:text-sm font-semibold transition-all shadow-[0_4px_15px_rgba(217,70,239,0.3)] dark:shadow-[0_0_15px_rgba(217,70,239,0.4)] ml-1 shrink-0"
+            className="bg-gradient-to-r from-[#d946ef] to-[#a855f7] hover:from-[#e879f9] hover:to-[#c084fc] text-white px-3 md:px-5 py-1.5 md:py-2.5 rounded-full flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs xl:text-sm font-semibold transition-all shadow-[0_4px_15px_rgba(217,70,239,0.3)] dark:shadow-[0_0_15px_rgba(217,70,239,0.4)] ml-1 shrink-0"
           >
-            <Shield className="w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0" />
+            <Shield className="w-3 h-3 md:w-4 md:h-4 shrink-0" />
             <span className="whitespace-nowrap">Admin</span>
           </Link>
         </div>

@@ -778,8 +778,25 @@ export function Admin() {
   useEffect(() => {
     const cachedPasscode = localStorage.getItem('anjy_passcode');
     const cachedMethod = localStorage.getItem('anjy_login_method');
-    if (cachedMethod === 'local' && cachedPasscode === 'admin123') {
-      setIsAuthenticated(true);
+    if (cachedMethod === 'local' && cachedPasscode) {
+      // Verify cached passcode with backend
+      fetch('/api/admin/verify_passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: cachedPasscode })
+      })
+      .then(res => {
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem('anjy_passcode');
+          localStorage.removeItem('anjy_login_method');
+        }
+      })
+      .catch(() => {
+        // Offline support: if server is unreachable, trust local cached session
+        setIsAuthenticated(true);
+      });
     }
   }, []);
 
@@ -815,13 +832,31 @@ export function Admin() {
     setAuthError('');
     setLoading(true);
 
-    if (password === 'admin123') {
-      localStorage.setItem('anjy_login_method', 'local');
-      localStorage.setItem('anjy_passcode', password);
-      setIsAuthenticated(true);
-      setLoading(false);
-    } else {
-      setAuthError('Invalid passcode. (Hint: use admin123)');
+    try {
+      const response = await fetch('/api/admin/verify_passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: password })
+      });
+      const resData = await response.json();
+      if (response.ok && resData.success) {
+        localStorage.setItem('anjy_login_method', 'local');
+        localStorage.setItem('anjy_passcode', password);
+        setIsAuthenticated(true);
+      } else {
+        setAuthError(resData.error || 'Invalid passcode.');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      // Offline fallback: if connection fails, allow default 'admin123'
+      if (password === 'admin123') {
+        localStorage.setItem('anjy_login_method', 'local');
+        localStorage.setItem('anjy_passcode', password);
+        setIsAuthenticated(true);
+      } else {
+        setAuthError('Connection failed and passcode is incorrect.');
+      }
+    } finally {
       setLoading(false);
     }
   };

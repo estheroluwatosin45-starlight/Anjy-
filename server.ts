@@ -183,6 +183,15 @@ const verifyAdmin = (req: express.Request, res: express.Response, next: express.
   next();
 };
 
+// Verify Passcode
+app.post('/api/admin/verify_passcode', (req, res) => {
+  const { passcode } = req.body;
+  if (passcode === (process.env.ADMIN_PASSCODE || 'admin123')) {
+    return res.json({ success: true });
+  }
+  res.status(401).json({ success: false, error: 'Invalid passcode' });
+});
+
 // Create Poem
 app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
   try {
