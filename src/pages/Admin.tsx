@@ -16,7 +16,11 @@ import {
   deleteContactMessage,
   getNewsletterSubscribers,
   deleteNewsletterSubscriber,
-  getRegisteredProfiles
+  getRegisteredProfiles,
+  deletePoem,
+  deleteDiaryEntry,
+  deleteBibleVerse,
+  deleteAffirmation
 } from '@/lib/storage';
 
 // --- Tab Components ---
@@ -103,6 +107,31 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
 
+  // List of previously created items
+  const [items, setItems] = useState<any[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const fetchItems = async () => {
+    setLoadingItems(true);
+    try {
+      if (type === 'Poem') {
+        const data = await getPoems(true);
+        setItems(data);
+      } else {
+        const data = await getDiaryEntries();
+        setItems(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [type]);
+
   const checkGrammar = async () => {
     if (!content) return;
     setChecking(true);
@@ -159,6 +188,7 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
         setContent('');
         setImageUrl('');
         setIsPrivate(false);
+        fetchItems(); // Reload list
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -166,6 +196,19 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
       setStatus({ type: 'error', message: 'An unexpected error occurred.', details: err.message || err });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm(`Are you sure you want to delete this ${type.toLowerCase()}?`)) return;
+    try {
+      const success = type === 'Poem' ? await deletePoem(id) : await deleteDiaryEntry(id);
+      if (success) {
+        setItems(items.filter(item => item.id !== id));
+        if (onPublishSuccess) onPublishSuccess();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -254,6 +297,67 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
       >
         {publishing ? 'Publishing...' : `Publish ${type}`}
       </button>
+
+      {/* List of Previous Items */}
+      <div className="pt-8 border-t border-gray-150 dark:border-gray-700/60 mt-8">
+        <h3 className="text-lg font-bold text-purple-950 dark:text-purple-300 mb-4">
+          Your Published {type === 'Poem' ? 'Poems' : 'Diary Entries'}
+        </h3>
+        
+        {loadingItems ? (
+          <p className="text-sm text-gray-400">Loading your entries...</p>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-gray-400">No {type === 'Poem' ? 'poems' : 'diary entries'} created yet.</p>
+        ) : (
+          <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-gray-850">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Title</th>
+                    <th className="px-6 py-4 font-semibold">Date Created</th>
+                    {type === 'Poem' && <th className="px-6 py-4 font-semibold">Status</th>}
+                    <th className="px-6 py-4 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {items.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                      <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200 truncate max-w-[200px]">
+                        {item.title}
+                      </td>
+                      <td className="px-6 py-4 text-xs">
+                        {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}
+                      </td>
+                      {type === 'Poem' && (
+                        <td className="px-6 py-4 text-xs">
+                          {item.is_private ? (
+                            <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/30 font-semibold">
+                              🔒 Private
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 px-2 py-0.5 rounded-full border border-green-200/50 dark:border-green-900/30 font-semibold">
+                              🌍 Public
+                            </span>
+                          )}
+                        </td>
+                      )}
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -270,6 +374,26 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
+
+  // List of previously created verses
+  const [verses, setVerses] = useState<any[]>([]);
+  const [loadingVerses, setLoadingVerses] = useState(false);
+
+  const fetchVerses = async () => {
+    setLoadingVerses(true);
+    try {
+      const data = await getBibleVerses(true);
+      setVerses(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingVerses(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVerses();
+  }, []);
 
   const generateAI = async () => {
     setLoading(true);
@@ -329,6 +453,7 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
         setVerseText('');
         setExplanation('');
         setIsPrivate(false);
+        fetchVerses(); // Reload list
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -336,6 +461,19 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
       setStatus({ type: 'error', message: 'An unexpected error occurred.', details: err.message || err });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this verse?')) return;
+    try {
+      const success = await deleteBibleVerse(id);
+      if (success) {
+        setVerses(verses.filter(v => v.id !== id));
+        if (onPublishSuccess) onPublishSuccess();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -386,6 +524,65 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
       >
         {publishing ? 'Saving...' : 'Save Verse'}
       </button>
+
+      {/* List of Previous Verses */}
+      <div className="pt-8 border-t border-gray-150 dark:border-gray-700/60 mt-8">
+        <h3 className="text-lg font-bold text-purple-950 dark:text-purple-300 mb-4">
+          Your Published Bible Verses
+        </h3>
+        
+        {loadingVerses ? (
+          <p className="text-sm text-gray-400">Loading scriptures...</p>
+        ) : verses.length === 0 ? (
+          <p className="text-sm text-gray-400">No verses saved yet.</p>
+        ) : (
+          <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-gray-850">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Reference</th>
+                    <th className="px-6 py-4 font-semibold">Verse Text</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {verses.map((verse) => (
+                    <tr key={verse.id} className="hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                      <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200">
+                        {verse.verse_reference}
+                      </td>
+                      <td className="px-6 py-4 text-xs truncate max-w-[200px]">
+                        {verse.verse_text}
+                      </td>
+                      <td className="px-6 py-4 text-xs">
+                        {verse.is_private ? (
+                          <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/30 font-semibold">
+                            🔒 Private
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 px-2 py-0.5 rounded-full border border-green-200/50 dark:border-green-900/30 font-semibold">
+                            🌍 Public
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDelete(verse.id)}
+                          className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -400,6 +597,26 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
+
+  // List of previously created affirmations
+  const [affirmations, setAffirmations] = useState<any[]>([]);
+  const [loadingAffirmations, setLoadingAffirmations] = useState(false);
+
+  const fetchAffirmations = async () => {
+    setLoadingAffirmations(true);
+    try {
+      const data = await getAffirmations(true);
+      setAffirmations(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAffirmations(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAffirmations();
+  }, []);
 
   const generateAI = async () => {
     setLoading(true);
@@ -454,6 +671,7 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
         setStatus({ type: 'success', message: 'Affirmation saved successfully!' });
         setAffirmation('');
         setIsPrivate(false);
+        fetchAffirmations(); // Reload list
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -461,6 +679,19 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
       setStatus({ type: 'error', message: 'An unexpected error occurred.', details: err.message || err });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this affirmation?')) return;
+    try {
+      const success = await deleteAffirmation(id);
+      if (success) {
+        setAffirmations(affirmations.filter(a => a.id !== id));
+        if (onPublishSuccess) onPublishSuccess();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -509,6 +740,61 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
       >
         {publishing ? 'Saving...' : 'Save Affirmation'}
       </button>
+
+      {/* List of Previous Affirmations */}
+      <div className="pt-8 border-t border-gray-150 dark:border-gray-700/60 mt-8">
+        <h3 className="text-lg font-bold text-purple-950 dark:text-purple-300 mb-4">
+          Your Published Affirmations
+        </h3>
+        
+        {loadingAffirmations ? (
+          <p className="text-sm text-gray-400">Loading affirmations...</p>
+        ) : affirmations.length === 0 ? (
+          <p className="text-sm text-gray-400">No affirmations saved yet.</p>
+        ) : (
+          <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-gray-850">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Affirmation Text</th>
+                    <th className="px-6 py-4 font-semibold">Status</th>
+                    <th className="px-6 py-4 text-right font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {affirmations.map((aff) => (
+                    <tr key={aff.id} className="hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                      <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200 truncate max-w-[300px]">
+                        {aff.affirmation_text}
+                      </td>
+                      <td className="px-6 py-4 text-xs">
+                        {aff.is_private ? (
+                          <span className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200/50 dark:border-amber-900/30 font-semibold">
+                            🔒 Private
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 px-2 py-0.5 rounded-full border border-green-200/50 dark:border-green-900/30 font-semibold">
+                            🌍 Public
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => handleDelete(aff.id)}
+                          className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

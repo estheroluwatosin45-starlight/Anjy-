@@ -535,3 +535,64 @@ export async function subscribeToNewsletter(email: string): Promise<{ success: b
   saveLocal<any>(STORAGE_KEYS.SUBSCRIBERS, localSubscriber);
   return { success: true };
 }
+
+// --- Delete helpers ---
+export async function deletePoem(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase.from('poems').delete().eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn('Error deleting poem:', err);
+    }
+  }
+  const items = getLocal<Poem>(STORAGE_KEYS.POEMS);
+  const filtered = items.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.POEMS, JSON.stringify(filtered));
+  return true;
+}
+
+export async function deleteDiaryEntry(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase.from('diary_entries').delete().eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn('Error deleting diary entry:', err);
+    }
+  }
+  const items = getLocal<DiaryEntry>(STORAGE_KEYS.DIARY);
+  const filtered = items.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.DIARY, JSON.stringify(filtered));
+  return true;
+}
+
+export async function deleteBibleVerse(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase.from('bible_verses').delete().eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn('Error deleting bible verse:', err);
+    }
+  }
+  const items = getLocal<BibleVerse>(STORAGE_KEYS.VERSES);
+  const filtered = items.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.VERSES, JSON.stringify(filtered));
+  return true;
+}
+
+export async function deleteAffirmation(id: string): Promise<boolean> {
+  if (supabase && getLoginMethod() === 'supabase' && isOnline()) {
+    try {
+      const { error } = await supabase.from('affirmations').delete().eq('id', id);
+      if (!error) return true;
+    } catch (err) {
+      console.warn('Error deleting affirmation:', err);
+    }
+  }
+  const items = getLocal<Affirmation>(STORAGE_KEYS.AFFIRMATIONS);
+  const filtered = items.filter(item => item.id !== id);
+  localStorage.setItem(STORAGE_KEYS.AFFIRMATIONS, JSON.stringify(filtered));
+  return true;
+}
