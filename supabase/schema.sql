@@ -107,3 +107,17 @@ create policy "Users can access messages sent to them" on contact_messages for a
 -- Newsletter Subscribers policies
 create policy "Public can subscribe to newsletter" on newsletter_subscribers for insert with check (true);
 create policy "Users can access their own subscribers list" on newsletter_subscribers for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Automatically create a profile when a new user signs up
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create or replace trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();

@@ -474,6 +474,85 @@ app.delete('/api/admin/newsletter_subscribers/:id', verifyAdmin, async (req, res
   }
 });
 
+// Broadcast Email to All Users and Subscribers
+app.post('/api/admin/broadcast', verifyAdmin, async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message are required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ error: 'Supabase is not configured' });
+    }
+    if (!resend) {
+      return res.status(503).json({ error: 'Resend is not configured' });
+    }
+
+    // 1. Fetch newsletter subscribers
+    const { data: subscribers, error: subError } = await supabase
+      .from('newsletter_subscribers')
+      .select('email');
+
+    // 2. Fetch registered profiles
+    const { data: profiles, error: profError } = await supabase
+      .from('profiles')
+      .select('email');
+
+    if (subError) console.error('Error fetching subscribers for broadcast:', subError);
+    if (profError) console.error('Error fetching profiles for broadcast:', profError);
+
+    // 3. Merge into unique emails set
+    const emailSet = new Set<string>();
+    if (subscribers) {
+      subscribers.forEach(s => {
+        if (s.email) emailSet.add(s.email.trim().toLowerCase());
+      });
+    }
+    if (profiles) {
+      profiles.forEach(p => {
+        if (p.email) emailSet.add(p.email.trim().toLowerCase());
+      });
+    }
+
+    const allEmails = Array.from(emailSet);
+
+    if (allEmails.length === 0) {
+      return res.json({ success: true, count: 0, message: 'No subscribers found' });
+    }
+
+    console.log(`[Broadcast System] Sending broadcast email to ${allEmails.length} recipients:`, allEmails);
+
+    // 4. Send using Resend (BCC to protect privacy)
+    const adminEmail = process.env.ADMIN_EMAIL || 'pipeloluwadavid@gmail.com';
+    const { data, error } = await resend.emails.send({
+      from: 'ANJY Updates <onboarding@resend.dev>',
+      to: adminEmail,
+      bcc: allEmails,
+      subject: subject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+          <h1 style="color: #6D28D9; border-bottom: 2px solid #ddd6fe; padding-bottom: 10px; margin-bottom: 20px;">ANJY Updates</h1>
+          <div style="font-size: 16px; white-space: pre-wrap;">${message}</div>
+          <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+          <p style="font-size: 12px; color: #9ca3af; text-align: center;">
+            You are receiving this email because you are a registered user or subscriber on ANJY.
+          </p>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('Resend broadcast error:', error);
+      return res.status(500).json({ error: 'Failed to send emails: ' + error.message });
+    }
+
+    res.json({ success: true, count: allEmails.length });
+  } catch (error: any) {
+    console.error('Error during broadcast:', error);
+    res.status(500).json({ error: 'Failed to process broadcast' });
+  }
+});
+
 // --- Server Startup or Export ---
 
 export default app;

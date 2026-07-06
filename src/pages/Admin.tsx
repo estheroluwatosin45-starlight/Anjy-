@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Lock, ShieldAlert, Sparkles, MessageCircle, PenTool, CheckCircle, Image as ImageIcon, Send, Mail, Download, Key, Users } from 'lucide-react';
+import { Profile } from '@/types';
 import { 
   savePoem, 
   saveDiaryEntry, 
@@ -14,7 +15,8 @@ import {
   getContactMessages,
   deleteContactMessage,
   getNewsletterSubscribers,
-  deleteNewsletterSubscriber
+  deleteNewsletterSubscriber,
+  getRegisteredProfiles
 } from '@/lib/storage';
 
 // --- Tab Components ---
@@ -675,14 +677,28 @@ function InboxTab({ onAction }: { onAction?: () => void }) {
 
 function SubscribersTab({ onAction }: { onAction?: () => void }) {
   const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Tabs for the user list display
+  const [listMode, setListMode] = useState<'registered' | 'newsletter'>('registered');
+
+  // Broadcast state
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const fetchSubscribers = async () => {
     setLoading(true);
     try {
-      const data = await getNewsletterSubscribers();
-      setSubscribers(data);
+      const [subsData, profsData] = await Promise.all([
+        getNewsletterSubscribers(),
+        getRegisteredProfiles()
+      ]);
+      setSubscribers(subsData);
+      setProfiles(profsData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -710,54 +726,212 @@ function SubscribersTab({ onAction }: { onAction?: () => void }) {
     }
   };
 
-  if (loading) return <div className="text-center py-20 text-gray-500">Loading subscribers...</div>;
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || !message.trim()) return;
+    setSendingBroadcast(true);
+    setBroadcastStatus(null);
+
+    try {
+      const passcode = localStorage.getItem('anjy_passcode') || '';
+      const response = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, message, passcode })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setBroadcastStatus({ 
+          type: 'success', 
+          text: `Broadcast email sent successfully to ${data.count} subscriber(s)!` 
+        });
+        setSubject('');
+        setMessage('');
+      } else {
+        setBroadcastStatus({ 
+          type: 'error', 
+          text: data.error || 'Failed to send broadcast announcement.' 
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setBroadcastStatus({ type: 'error', text: 'Network error sending broadcast. Check your connection.' });
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
+  if (loading) return <div className="text-center py-20 text-gray-500">Loading subscribers and users...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2 text-[#4C1D95] dark:text-purple-400">
-          <Users className="text-[#6D28D9] w-6 h-6" /> Newsletter Subscribers
+    <div className="space-y-8">
+      {/* 1. Broadcast Composer */}
+      <div className="bg-[#FAF5FF] dark:bg-purple-950/10 p-6 rounded-2xl border border-purple-100 dark:border-purple-900/40 shadow-sm">
+        <h2 className="text-lg font-bold text-[#4C1D95] dark:text-purple-400 mb-2 flex items-center gap-2">
+          <Mail className="w-5 h-5 text-[#6D28D9]" /> Broadcast announcement to everyone
         </h2>
-        <span className="text-xs font-semibold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-200 px-2.5 py-1 rounded-full">
-          {subscribers.length} Subscribers
-        </span>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
+          Write an update or newsletter below. This will email all registered users and newsletter subscribers simultaneously.
+        </p>
+
+        {broadcastStatus && (
+          <div className={`p-4 rounded-xl border text-sm flex items-start gap-2.5 mb-6 font-medium leading-relaxed ${
+            broadcastStatus.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            {broadcastStatus.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 shrink-0 text-green-600" />
+            ) : (
+              <ShieldAlert className="w-5 h-5 shrink-0 text-red-600" />
+            )}
+            {broadcastStatus.text}
+          </div>
+        )}
+
+        <form onSubmit={handleSendBroadcast} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-purple-900/70 dark:text-purple-300 mb-1">
+              Email Subject
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. A New Poem is Out: Walking in Grace"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-purple-900/70 dark:text-purple-300 mb-1">
+              Message Body
+            </label>
+            <textarea
+              placeholder="Type your message here. Line breaks will be preserved in the email..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={6}
+              className="w-full px-4 py-3 rounded-xl border border-gray-250 dark:border-gray-700 bg-white dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm leading-relaxed"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={sendingBroadcast || !subject.trim() || !message.trim()}
+            className="px-6 py-3 bg-[#6D28D9] hover:bg-[#4C1D95] text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="w-4 h-4" />
+            {sendingBroadcast ? 'Sending Broadcast...' : 'Send Broadcast to All'}
+          </button>
+        </form>
       </div>
 
-      {subscribers.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-gray-400">
-          <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#6D28D9]" />
-          <p>No newsletter subscribers yet.</p>
+      {/* 2. Dual Subscriber Lists */}
+      <div className="space-y-4">
+        {/* Header and Counters */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex border-b border-gray-150 dark:border-gray-700 w-full sm:w-auto">
+            <button
+              onClick={() => setListMode('registered')}
+              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+                listMode === 'registered' 
+                  ? 'border-[#6D28D9] text-[#6D28D9]' 
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Registered Users ({profiles.length})
+            </button>
+            <button
+              onClick={() => setListMode('newsletter')}
+              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+                listMode === 'newsletter' 
+                  ? 'border-[#6D28D9] text-[#6D28D9]' 
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              Newsletter Signups ({subscribers.length})
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
-              <tr>
-                <th className="px-6 py-3 font-semibold">Email Address</th>
-                <th className="px-6 py-3 font-semibold">Subscribed Date</th>
-                <th className="px-6 py-3 text-right font-semibold">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-850">
-              {subscribers.map((sub) => (
-                <tr key={sub.id} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750/30">
-                  <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-200">{sub.email}</td>
-                  <td className="px-6 py-4">{new Date(sub.created_at).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => handleDelete(sub.id)}
-                      disabled={deletingId === sub.id}
-                      className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs disabled:opacity-50 cursor-pointer"
-                    >
-                      {deletingId === sub.id ? 'Removing...' : 'Remove'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+
+        {/* List Content */}
+        {listMode === 'registered' ? (
+          profiles.length === 0 ? (
+            <div className="text-center py-16 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 text-gray-400">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#6D28D9]" />
+              <p>No registered user accounts found.</p>
+            </div>
+          ) : (
+            <div className="border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-gray-850">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold">User Email</th>
+                      <th className="px-6 py-4 font-semibold">Name / Alias</th>
+                      <th className="px-6 py-4 font-semibold">Registration Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {profiles.map((prof) => (
+                      <tr key={prof.id} className="hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                        <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-250">{prof.email}</td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{prof.full_name || 'Anonymous User'}</td>
+                        <td className="px-6 py-4">
+                          {prof.created_at ? new Date(prof.created_at).toLocaleString() : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        ) : (
+          subscribers.length === 0 ? (
+            <div className="text-center py-16 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 text-gray-400">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-50 text-[#6D28D9]" />
+              <p>No newsletter subscribers found.</p>
+            </div>
+          ) : (
+            <div className="border border-gray-100 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm bg-white dark:bg-gray-850">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-900 dark:text-gray-350 border-b border-gray-100 dark:border-gray-800">
+                    <tr>
+                      <th className="px-6 py-4 font-semibold">Subscriber Email</th>
+                      <th className="px-6 py-4 font-semibold">Subscribed Date</th>
+                      <th className="px-6 py-4 text-right font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {subscribers.map((sub) => (
+                      <tr key={sub.id} className="hover:bg-gray-50 dark:hover:bg-gray-750/30">
+                        <td className="px-6 py-4 font-medium text-gray-800 dark:text-gray-250">{sub.email}</td>
+                        <td className="px-6 py-4">
+                          {sub.created_at ? new Date(sub.created_at).toLocaleString() : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleDelete(sub.id)}
+                            disabled={deletingId === sub.id}
+                            className="text-red-600 hover:text-red-900 dark:hover:text-red-400 font-semibold text-xs disabled:opacity-50 cursor-pointer"
+                          >
+                            {deletingId === sub.id ? 'Removing...' : 'Remove'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }
@@ -874,6 +1048,7 @@ export function Admin({ passcodeOnly = false }: { passcodeOnly?: boolean }) {
           if (signUpData.user) {
             localStorage.setItem('anjy_login_method', 'supabase');
             localStorage.setItem('anjy_user_email', adminEmail);
+            localStorage.setItem('anjy_passcode', password);
             setIsAuthenticated(true);
             return;
           }
@@ -884,6 +1059,7 @@ export function Admin({ passcodeOnly = false }: { passcodeOnly?: boolean }) {
         if (data.user) {
           localStorage.setItem('anjy_login_method', 'supabase');
           localStorage.setItem('anjy_user_email', adminEmail);
+          localStorage.setItem('anjy_passcode', password);
           setIsAuthenticated(true);
         }
       } else {

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Poem, DiaryEntry, BibleVerse, Affirmation } from '../types';
+import { Poem, DiaryEntry, BibleVerse, Affirmation, Profile } from '../types';
 
 export const STORAGE_KEYS = {
   POEMS: 'anjy_local_poems',
@@ -453,6 +453,22 @@ export async function getNewsletterSubscribers(): Promise<any[]> {
   }
 
   return getLocal<any>(STORAGE_KEYS.SUBSCRIBERS);
+}
+
+// --- Registered Profiles ---
+export async function getRegisteredProfiles(): Promise<Profile[]> {
+  if (supabase && isOnline()) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) return data;
+    } catch (err) {
+      console.warn('Error fetching registered profiles:', err);
+    }
+  }
+  return [];
 }
 
 export async function deleteNewsletterSubscriber(id: string): Promise<boolean> {
