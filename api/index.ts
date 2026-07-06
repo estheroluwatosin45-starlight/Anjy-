@@ -284,6 +284,20 @@ app.post('/api/admin/verify_passcode', (req, res) => {
   res.status(401).json({ success: false, error: 'Invalid passcode' });
 });
 
+// Helper to get owner's user ID from database
+const getOwnerUserId = async () => {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .in('email', ['pipeloluwadavid@gmail.com', 'anjy@gmail.com', 'estheroluwatosin45@gmail.com', 'estheroluwatosin45-starlight@github.com'])
+    .limit(1);
+  if (!error && data && data.length > 0) {
+    return data[0].id;
+  }
+  return null;
+};
+
 // Create Poem
 app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
   try {
@@ -291,10 +305,13 @@ app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
     if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
     if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
 
+    const ownerId = await getOwnerUserId();
+    if (!ownerId) return res.status(500).json({ error: 'Failed to resolve website owner user profile. Please register first.' });
+
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const { data, error } = await supabase
       .from('poems')
-      .insert([{ title, content, featured_image, slug }])
+      .insert([{ title, content, featured_image, slug, user_id: ownerId }])
       .select()
       .single();
 
@@ -313,10 +330,13 @@ app.post('/api/admin/diary_entries', verifyAdmin, async (req, res) => {
     if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
     if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
 
+    const ownerId = await getOwnerUserId();
+    if (!ownerId) return res.status(500).json({ error: 'Failed to resolve website owner user profile. Please register first.' });
+
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const { data, error } = await supabase
       .from('diary_entries')
-      .insert([{ title, content, mood, slug }])
+      .insert([{ title, content, mood, slug, user_id: ownerId }])
       .select()
       .single();
 
@@ -337,9 +357,12 @@ app.post('/api/admin/bible_verses', verifyAdmin, async (req, res) => {
     }
     if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
 
+    const ownerId = await getOwnerUserId();
+    if (!ownerId) return res.status(500).json({ error: 'Failed to resolve website owner user profile. Please register first.' });
+
     const { data, error } = await supabase
       .from('bible_verses')
-      .insert([{ verse_reference, verse_text, explanation, display_date }])
+      .insert([{ verse_reference, verse_text, explanation, display_date, user_id: ownerId }])
       .select()
       .single();
 
@@ -360,9 +383,12 @@ app.post('/api/admin/affirmations', verifyAdmin, async (req, res) => {
     }
     if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
 
+    const ownerId = await getOwnerUserId();
+    if (!ownerId) return res.status(500).json({ error: 'Failed to resolve website owner user profile. Please register first.' });
+
     const { data, error } = await supabase
       .from('affirmations')
-      .insert([{ title: title || 'Daily Affirmation', affirmation_text, display_date }])
+      .insert([{ title: title || 'Daily Affirmation', affirmation_text, display_date, user_id: ownerId }])
       .select()
       .single();
 

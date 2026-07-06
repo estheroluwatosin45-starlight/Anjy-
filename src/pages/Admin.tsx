@@ -765,7 +765,7 @@ function SubscribersTab({ onAction }: { onAction?: () => void }) {
 export function Admin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authMode, setAuthMode] = useState<'passcode' | 'signin' | 'signup'>('passcode');
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -809,7 +809,7 @@ export function Admin() {
       const p = await getPoems(true);
       const d = await getDiaryEntries();
       const v = await getBibleVerses(true);
-      const a = await getAffirmations(true);
+      const a = await getAffAffirmations(true);
       const m = await getContactMessages();
       const s = await getNewsletterSubscribers();
       setCounts({
@@ -825,11 +825,79 @@ export function Admin() {
     }
   };
 
+  // Helper function to resolve typescript undefined error for getAffirmations renamed in imports
+  const getAffAffirmations = async (forAdmin: boolean) => {
+    return getAffirmations(forAdmin);
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchCounts();
     }
   }, [isAuthenticated, activeTab]);
+
+  const handlePasscodeLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setLoading(true);
+
+    try {
+      // 1. Verify passcode with backend API first
+      const response = await fetch('/api/admin/verify_passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: password })
+      });
+      const resData = await response.json();
+      if (!response.ok || !resData.success) {
+        throw new Error('Invalid passcode.');
+      }
+
+      // 2. Sign in to Supabase Auth using owner's email and passcode as password
+      if (supabase) {
+        const adminEmail = 'pipeloluwadavid@gmail.com';
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: adminEmail,
+          password: password,
+        });
+
+        if (error && (error.message.includes('Invalid login credentials') || error.status === 400)) {
+          // If admin user doesn't exist in Supabase Auth yet, register it dynamically
+          console.log('Registering admin account in Supabase Auth...');
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: adminEmail,
+            password: password,
+          });
+          if (signUpError) throw signUpError;
+          if (signUpData.user) {
+            localStorage.setItem('anjy_login_method', 'supabase');
+            localStorage.setItem('anjy_user_email', adminEmail);
+            setIsAuthenticated(true);
+            return;
+          }
+        } else if (error) {
+          throw error;
+        }
+
+        if (data.user) {
+          localStorage.setItem('anjy_login_method', 'supabase');
+          localStorage.setItem('anjy_user_email', adminEmail);
+          setIsAuthenticated(true);
+        }
+      } else {
+        // Fallback if supabase is offline
+        localStorage.setItem('anjy_login_method', 'local');
+        localStorage.setItem('anjy_passcode', password);
+        localStorage.setItem('anjy_user_email', 'pipeloluwadavid@gmail.com');
+        setIsAuthenticated(true);
+      }
+    } catch (err: any) {
+      console.error('Passcode login error:', err);
+      setAuthError(err.message || 'Passcode verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -886,6 +954,7 @@ export function Admin() {
     }
     localStorage.removeItem('anjy_login_method');
     localStorage.removeItem('anjy_user_email');
+    localStorage.removeItem('anjy_passcode');
     setIsAuthenticated(false);
     setEmail('');
     setPassword('');
@@ -900,14 +969,20 @@ export function Admin() {
             <Lock className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-[#1F2937] dark:text-gray-100 mb-2 text-center">
-            {authMode === 'signin' ? 'Sign In to ANJY' : 'Create Account'}
+            {authMode === 'passcode' ? 'Owner Passcode Access' : authMode === 'signin' ? 'Sign In to ANJY' : 'Create Account'}
           </h1>
           <p className="text-gray-500 text-sm mb-6 text-center">
-            {authMode === 'signin' ? 'Access your private journal space.' : 'Sign up to start your private journal.'}
+            {authMode === 'passcode' ? 'Enter passcode to manage website.' : authMode === 'signin' ? 'Access your private journal space.' : 'Sign up to start your private journal.'}
           </p>
 
           {/* Tab Selector */}
           <div className="flex border-b border-gray-100 dark:border-gray-700 mb-6">
+            <button
+              onClick={() => { setAuthMode('passcode'); setAuthError(''); }}
+              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'passcode' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+              Passcode
+            </button>
             <button
               onClick={() => { setAuthMode('signin'); setAuthError(''); }}
               className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signin' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
@@ -929,28 +1004,30 @@ export function Admin() {
             </div>
           )}
 
-          <form onSubmit={authMode === 'signin' ? handleLogin : handleSignUp} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">
-                Email Address
-              </label>
-              <input 
-                type="email" 
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
-                required
-              />
-            </div>
+          <form onSubmit={authMode === 'passcode' ? handlePasscodeLogin : authMode === 'signin' ? handleLogin : handleSignUp} className="space-y-4">
+            {authMode !== 'passcode' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">
+                  Email Address
+                </label>
+                <input 
+                  type="email" 
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
+                  required
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">
-                Password
+                {authMode === 'passcode' ? 'Owner Passcode' : 'Password'}
               </label>
               <input 
                 type="password" 
-                placeholder="Enter password"
+                placeholder={authMode === 'passcode' ? 'Enter owner passcode' : 'Enter password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
@@ -963,7 +1040,7 @@ export function Admin() {
               disabled={loading}
               className="w-full py-3 bg-[#6D28D9] text-white rounded-lg font-medium hover:bg-[#4C1D95] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-md"
             >
-              {loading ? 'Processing...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+              {loading ? 'Processing...' : authMode === 'passcode' ? 'Verify Passcode' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
         </div>
