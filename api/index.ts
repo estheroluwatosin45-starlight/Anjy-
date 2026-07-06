@@ -173,6 +173,54 @@ app.post('/api/backup', async (req, res) => {
   }
 });
 
+// Diagnostic debug endpoint
+app.get('/api/debug', async (req, res) => {
+  const envInfo: any = {};
+  
+  const mask = (val: string | undefined) => {
+    if (!val) return 'undefined';
+    if (val.length <= 8) return 'defined (short)';
+    return `${val.substring(0, 4)}...${val.substring(val.length - 4)}`;
+  };
+
+  envInfo.VITE_SUPABASE_URL = mask(process.env.VITE_SUPABASE_URL);
+  envInfo.VITE_SUPABASE_ANON_KEY = mask(process.env.VITE_SUPABASE_ANON_KEY);
+  envInfo.RESEND_API_KEY = mask(process.env.RESEND_API_KEY);
+  envInfo.ADMIN_PASSCODE = mask(process.env.ADMIN_PASSCODE);
+  envInfo.supabase_client_exists = !!supabase;
+  envInfo.resend_client_exists = !!resend;
+
+  const status: any = { env: envInfo };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('poems').select('id').limit(1);
+      if (error) {
+        status.supabase_connection = { success: false, error: error.message, details: error };
+      } else {
+        status.supabase_connection = { success: true, count: data.length };
+      }
+    } catch (err: any) {
+      status.supabase_connection = { success: false, error: err.message, stack: err.stack };
+    }
+  } else {
+    status.supabase_connection = { success: false, error: 'Supabase client not initialized' };
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const testResend = new Resend(process.env.RESEND_API_KEY);
+      status.resend_initialization = { success: true, defined: !!testResend };
+    } catch (err: any) {
+      status.resend_initialization = { success: false, error: err.message, stack: err.stack };
+    }
+  } else {
+    status.resend_initialization = { success: false, error: 'RESEND_API_KEY is not defined' };
+  }
+
+  return res.json(status);
+});
+
 // --- Admin Database Operations (Option C) ---
 
 const verifyAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
