@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
@@ -405,32 +404,5 @@ app.delete('/api/admin/newsletter_subscribers/:id', verifyAdmin, async (req, res
 });
 
 // --- Server Startup or Export ---
-
-const startServer = async () => {
-  const PORT = 3000;
-  
-  // Only mount static serving & Vite if NOT running as Vercel serverless function
-  if (!process.env.VERCEL) {
-    if (process.env.NODE_ENV !== 'production') {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
-    }
-
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-};
-
-startServer();
 
 export default app;
