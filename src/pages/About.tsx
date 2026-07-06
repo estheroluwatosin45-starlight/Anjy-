@@ -8,7 +8,7 @@ export function About() {
         <div className="flex justify-center mb-12">
           <div className="relative group max-w-sm w-full overflow-hidden rounded-2xl shadow-md border border-purple-100 dark:border-gray-700">
             <img 
-              src="/author.png" 
+              src="/author.jpg" 
               alt="Anjy" 
               className="w-full object-cover aspect-[3/4] group-hover:scale-[1.02] transition-transform duration-300"
             />
