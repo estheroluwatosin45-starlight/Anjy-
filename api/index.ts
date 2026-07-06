@@ -301,7 +301,7 @@ const getOwnerUserId = async () => {
 // Create Poem
 app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
   try {
-    const { title, content, featured_image } = req.body;
+    const { title, content, featured_image, is_private } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
     if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
 
@@ -311,7 +311,7 @@ app.post('/api/admin/poems', verifyAdmin, async (req, res) => {
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const { data, error } = await supabase
       .from('poems')
-      .insert([{ title, content, featured_image, slug, user_id: ownerId }])
+      .insert([{ title, content, featured_image, slug, user_id: ownerId, is_private: !!is_private }])
       .select()
       .single();
 
@@ -351,7 +351,7 @@ app.post('/api/admin/diary_entries', verifyAdmin, async (req, res) => {
 // Create Bible Verse
 app.post('/api/admin/bible_verses', verifyAdmin, async (req, res) => {
   try {
-    const { verse_reference, verse_text, explanation, display_date } = req.body;
+    const { verse_reference, verse_text, explanation, display_date, is_private } = req.body;
     if (!verse_reference || !verse_text || !display_date) {
       return res.status(400).json({ error: 'Reference, text, and display date are required' });
     }
@@ -362,7 +362,7 @@ app.post('/api/admin/bible_verses', verifyAdmin, async (req, res) => {
 
     const { data, error } = await supabase
       .from('bible_verses')
-      .insert([{ verse_reference, verse_text, explanation, display_date, user_id: ownerId }])
+      .insert([{ verse_reference, verse_text, explanation, display_date, user_id: ownerId, is_private: !!is_private }])
       .select()
       .single();
 
@@ -377,7 +377,7 @@ app.post('/api/admin/bible_verses', verifyAdmin, async (req, res) => {
 // Create Affirmation
 app.post('/api/admin/affirmations', verifyAdmin, async (req, res) => {
   try {
-    const { title, affirmation_text, display_date } = req.body;
+    const { title, affirmation_text, display_date, is_private } = req.body;
     if (!affirmation_text || !display_date) {
       return res.status(400).json({ error: 'Affirmation text and display date are required' });
     }
@@ -388,7 +388,7 @@ app.post('/api/admin/affirmations', verifyAdmin, async (req, res) => {
 
     const { data, error } = await supabase
       .from('affirmations')
-      .insert([{ title: title || 'Daily Affirmation', affirmation_text, display_date, user_id: ownerId }])
+      .insert([{ title: title || 'Daily Affirmation', affirmation_text, display_date, user_id: ownerId, is_private: !!is_private }])
       .select()
       .single();
 

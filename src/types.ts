@@ -13,6 +13,7 @@ export interface Poem {
   content: string;
   featured_image: string;
   created_at: string;
+  is_private: boolean;
 }
 
 export interface DiaryEntry {
@@ -30,6 +31,7 @@ export interface BibleVerse {
   verse_text: string;
   explanation: string;
   display_date: string;
+  is_private: boolean;
 }
 
 export interface Affirmation {
@@ -37,4 +39,5 @@ export interface Affirmation {
   title: string;
   affirmation_text: string;
   display_date: string;
+  is_private: boolean;
 }

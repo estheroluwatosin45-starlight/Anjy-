@@ -121,3 +121,8 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Add privacy support to portfolio items
+alter table poems add column if not exists is_private boolean default false not null;
+alter table bible_verses add column if not exists is_private boolean default false not null;
+alter table affirmations add column if not exists is_private boolean default false not null;

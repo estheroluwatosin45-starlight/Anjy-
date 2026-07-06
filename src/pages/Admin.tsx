@@ -98,6 +98,7 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [checking, setChecking] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
@@ -133,7 +134,7 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
     try {
       let result;
       if (type === 'Poem') {
-        result = await savePoem({ title, content, featured_image: imageUrl });
+        result = await savePoem({ title, content, featured_image: imageUrl, is_private: isPrivate });
       } else {
         result = await saveDiaryEntry({ title, content, mood: 'Reflective' });
       }
@@ -157,6 +158,7 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
         setTitle('');
         setContent('');
         setImageUrl('');
+        setIsPrivate(false);
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -213,6 +215,21 @@ function WritingEditor({ type, onPublishSuccess }: WritingEditorProps) {
           <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
         </div>
       )}
+
+      {type === 'Poem' && (
+        <div className="flex items-center gap-2 mb-2">
+          <input 
+            type="checkbox"
+            id="poem-private"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-700 text-[#6D28D9] focus:ring-[#6D28D9] cursor-pointer"
+          />
+          <label htmlFor="poem-private" className="text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer flex items-center gap-1">
+            <Lock className="w-3.5 h-3.5" /> Keep this poem private (do not show on public website)
+          </label>
+        </div>
+      )}
       
       <div className="relative">
         <textarea 
@@ -252,6 +269,7 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const generateAI = async () => {
     setLoading(true);
@@ -259,11 +277,9 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
     try {
       const res = await fetch('/api/generate-verse', { method: 'POST' });
       const data = await res.json();
-      if (data.verse_reference) {
-        setVerseRef(data.verse_reference);
-        setVerseText(data.verse_text);
-        setExplanation(data.explanation);
-      }
+      if (data.verse_reference) setVerseRef(data.verse_reference);
+      if (data.verse_text) setVerseText(data.verse_text);
+      if (data.explanation) setExplanation(data.explanation);
     } catch (err) {
       console.error(err);
       setStatus({ type: 'error', message: 'Failed to auto-generate verse.' });
@@ -286,7 +302,8 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
         verse_reference: verseRef,
         verse_text: verseText,
         explanation,
-        display_date: today
+        display_date: today,
+        is_private: isPrivate
       });
 
       if (result.error) {
@@ -311,6 +328,7 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
         setVerseRef('');
         setVerseText('');
         setExplanation('');
+        setIsPrivate(false);
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -347,6 +365,20 @@ function BibleVerseGenerator({ onPublishSuccess }: BibleVerseGeneratorProps) {
       <input type="text" placeholder="Reference (e.g. John 3:16)" value={verseRef} onChange={e => setVerseRef(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]" />
       <textarea placeholder="Verse text..." value={verseText} onChange={e => setVerseText(e.target.value)} rows={3} className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]" />
       <textarea placeholder="Explanation..." value={explanation} onChange={e => setExplanation(e.target.value)} rows={3} className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9]" />
+
+      <div className="flex items-center gap-2 mb-2">
+        <input 
+          type="checkbox"
+          id="verse-private"
+          checked={isPrivate}
+          onChange={(e) => setIsPrivate(e.target.checked)}
+          className="rounded border-gray-300 dark:border-gray-700 text-[#6D28D9] focus:ring-[#6D28D9] cursor-pointer"
+        />
+        <label htmlFor="verse-private" className="text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer flex items-center gap-1">
+          <Lock className="w-3.5 h-3.5" /> Keep this verse private (do not show on public website)
+        </label>
+      </div>
+
       <button 
         onClick={handleSave} 
         disabled={publishing}
@@ -367,6 +399,7 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string; details?: string } | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const generateAI = async () => {
     setLoading(true);
@@ -396,7 +429,8 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
       const result = await saveAffirmation({
         title: 'Daily Affirmation',
         affirmation_text: affirmation,
-        display_date: today
+        display_date: today,
+        is_private: isPrivate
       });
 
       if (result.error) {
@@ -419,6 +453,7 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
       } else {
         setStatus({ type: 'success', message: 'Affirmation saved successfully!' });
         setAffirmation('');
+        setIsPrivate(false);
         if (onPublishSuccess) onPublishSuccess();
       }
     } catch (err: any) {
@@ -453,6 +488,20 @@ function AffirmationGenerator({ onPublishSuccess }: AffirmationGeneratorProps) {
       )}
 
       <textarea placeholder="Write or generate affirmation..." value={affirmation} onChange={e => setAffirmation(e.target.value)} rows={4} className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-lg text-center font-medium" />
+
+      <div className="flex items-center gap-2 mb-2">
+        <input 
+          type="checkbox"
+          id="affirmation-private"
+          checked={isPrivate}
+          onChange={(e) => setIsPrivate(e.target.checked)}
+          className="rounded border-gray-300 dark:border-gray-700 text-[#6D28D9] focus:ring-[#6D28D9] cursor-pointer"
+        />
+        <label htmlFor="affirmation-private" className="text-xs font-semibold text-gray-600 dark:text-gray-400 cursor-pointer flex items-center gap-1">
+          <Lock className="w-3.5 h-3.5" /> Keep this affirmation private (do not show on public website)
+        </label>
+      </div>
+
       <button 
         onClick={handleSave} 
         disabled={publishing}

@@ -74,7 +74,7 @@ export async function getPoems(forAdmin = false): Promise<Poem[]> {
       if (!forAdmin) {
         const ownerId = await getOwnerUserId();
         if (ownerId) {
-          query = query.eq('user_id', ownerId);
+          query = query.eq('user_id', ownerId).eq('is_private', false);
         }
       }
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -83,7 +83,8 @@ export async function getPoems(forAdmin = false): Promise<Poem[]> {
       console.warn('Network error fetching poems, falling back to local storage:', err);
     }
   }
-  return getLocal<Poem>(STORAGE_KEYS.POEMS);
+  const localItems = getLocal<Poem>(STORAGE_KEYS.POEMS);
+  return forAdmin ? localItems : localItems.filter(p => !p.is_private);
 }
 
 export async function savePoem(poem: Omit<Poem, 'id' | 'created_at' | 'slug'>): Promise<{ data: Poem | null; error: any }> {
@@ -205,7 +206,7 @@ export async function getBibleVerses(forAdmin = false): Promise<BibleVerse[]> {
       if (!forAdmin) {
         const ownerId = await getOwnerUserId();
         if (ownerId) {
-          query = query.eq('user_id', ownerId);
+          query = query.eq('user_id', ownerId).eq('is_private', false);
         }
       }
       const { data, error } = await query.order('display_date', { ascending: false });
@@ -214,7 +215,8 @@ export async function getBibleVerses(forAdmin = false): Promise<BibleVerse[]> {
       console.warn('Network error fetching bible verses, falling back to local storage:', err);
     }
   }
-  return getLocal<BibleVerse>(STORAGE_KEYS.VERSES);
+  const localItems = getLocal<BibleVerse>(STORAGE_KEYS.VERSES);
+  return forAdmin ? localItems : localItems.filter(v => !v.is_private);
 }
 
 export async function saveBibleVerse(verse: Omit<BibleVerse, 'id'>): Promise<{ data: BibleVerse | null; error: any }> {
@@ -267,7 +269,7 @@ export async function getAffirmations(forAdmin = false): Promise<Affirmation[]> 
       if (!forAdmin) {
         const ownerId = await getOwnerUserId();
         if (ownerId) {
-          query = query.eq('user_id', ownerId);
+          query = query.eq('user_id', ownerId).eq('is_private', false);
         }
       }
       const { data, error } = await query.order('display_date', { ascending: false });
@@ -276,7 +278,8 @@ export async function getAffirmations(forAdmin = false): Promise<Affirmation[]> 
       console.warn('Network error fetching affirmations, falling back to local storage:', err);
     }
   }
-  return getLocal<Affirmation>(STORAGE_KEYS.AFFIRMATIONS);
+  const localItems = getLocal<Affirmation>(STORAGE_KEYS.AFFIRMATIONS);
+  return forAdmin ? localItems : localItems.filter(a => !a.is_private);
 }
 
 export async function saveAffirmation(affirmation: Omit<Affirmation, 'id'>): Promise<{ data: Affirmation | null; error: any }> {
