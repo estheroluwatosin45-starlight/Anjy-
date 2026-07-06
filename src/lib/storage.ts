@@ -297,13 +297,17 @@ export function exportLocalData() {
     contactMessages: getLocal<any>(STORAGE_KEYS.MESSAGES),
     newsletterSubscribers: getLocal<any>(STORAGE_KEYS.SUBSCRIBERS),
   };
-  const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
   const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute('href', jsonString);
-  downloadAnchor.setAttribute('download', `anjy_local_backup_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.href = url;
+  downloadAnchor.download = `anjy_local_backup_${new Date().toISOString().split('T')[0]}.json`;
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
-  downloadAnchor.remove();
+  document.body.removeChild(downloadAnchor);
+  URL.revokeObjectURL(url);
 }
 
 // --- Contact Messages ---
