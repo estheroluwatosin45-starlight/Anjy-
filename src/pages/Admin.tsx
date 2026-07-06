@@ -806,10 +806,10 @@ export function Admin() {
 
   const fetchCounts = async () => {
     try {
-      const p = await getPoems();
+      const p = await getPoems(true);
       const d = await getDiaryEntries();
-      const v = await getBibleVerses();
-      const a = await getAffirmations();
+      const v = await getBibleVerses(true);
+      const a = await getAffirmations(true);
       const m = await getContactMessages();
       const s = await getNewsletterSubscribers();
       setCounts({

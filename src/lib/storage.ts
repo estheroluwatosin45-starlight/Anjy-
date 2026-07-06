@@ -50,13 +50,34 @@ function isOnline(): boolean {
 }
 
 // --- Poems ---
-export async function getPoems(): Promise<Poem[]> {
+export async function getOwnerUserId(): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('email', ['pipeloluwadavid@gmail.com', 'anjy@gmail.com', 'estheroluwatosin45@gmail.com', 'estheroluwatosin45-starlight@github.com'])
+      .limit(1);
+    if (!error && data && data.length > 0) {
+      return data[0].id;
+    }
+  } catch (err) {
+    console.error('Error getting owner user ID:', err);
+  }
+  return null;
+}
+
+export async function getPoems(forAdmin = false): Promise<Poem[]> {
   if (supabase && isOnline()) {
     try {
-      const { data, error } = await supabase
-        .from('poems')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let query = supabase.from('poems').select('*');
+      if (!forAdmin) {
+        const ownerId = await getOwnerUserId();
+        if (ownerId) {
+          query = query.eq('user_id', ownerId);
+        }
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (!error && data) return data;
     } catch (err) {
       console.warn('Network error fetching poems, falling back to local storage:', err);
@@ -177,13 +198,17 @@ export async function saveDiaryEntry(entry: Omit<DiaryEntry, 'id' | 'created_at'
 }
 
 // --- Bible Verses ---
-export async function getBibleVerses(): Promise<BibleVerse[]> {
+export async function getBibleVerses(forAdmin = false): Promise<BibleVerse[]> {
   if (supabase && isOnline()) {
     try {
-      const { data, error } = await supabase
-        .from('bible_verses')
-        .select('*')
-        .order('display_date', { ascending: false });
+      let query = supabase.from('bible_verses').select('*');
+      if (!forAdmin) {
+        const ownerId = await getOwnerUserId();
+        if (ownerId) {
+          query = query.eq('user_id', ownerId);
+        }
+      }
+      const { data, error } = await query.order('display_date', { ascending: false });
       if (!error && data) return data;
     } catch (err) {
       console.warn('Network error fetching bible verses, falling back to local storage:', err);
@@ -235,13 +260,17 @@ export async function saveBibleVerse(verse: Omit<BibleVerse, 'id'>): Promise<{ d
 }
 
 // --- Affirmations ---
-export async function getAffirmations(): Promise<Affirmation[]> {
+export async function getAffirmations(forAdmin = false): Promise<Affirmation[]> {
   if (supabase && isOnline()) {
     try {
-      const { data, error } = await supabase
-        .from('affirmations')
-        .select('*')
-        .order('display_date', { ascending: false });
+      let query = supabase.from('affirmations').select('*');
+      if (!forAdmin) {
+        const ownerId = await getOwnerUserId();
+        if (ownerId) {
+          query = query.eq('user_id', ownerId);
+        }
+      }
+      const { data, error } = await query.order('display_date', { ascending: false });
       if (!error && data) return data;
     } catch (err) {
       console.warn('Network error fetching affirmations, falling back to local storage:', err);

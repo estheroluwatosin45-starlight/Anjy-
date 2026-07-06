@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Search } from 'lucide-react';
+import { Book, Search } from 'lucide-react';
 import { getDiaryEntries } from '@/lib/storage';
 import { DiaryEntry } from '@/types';
 
@@ -9,8 +9,14 @@ export function Diary() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const isLoggedIn = localStorage.getItem('anjy_login_method') === 'supabase';
+
   useEffect(() => {
     async function fetchEntries() {
+      if (!isLoggedIn) {
+        setLoading(false);
+        return;
+      }
       try {
         const data = await getDiaryEntries();
         setEntries(data);
@@ -21,13 +27,35 @@ export function Diary() {
       }
     }
     fetchEntries();
-  }, []);
+  }, [isLoggedIn]);
 
   const filteredEntries = entries.filter(entry => 
     entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     entry.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (entry.mood && entry.mood.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  if (!isLoggedIn) {
+    return (
+      <div className="flex-grow flex items-center justify-center bg-transparent py-24 px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 dark:border-gray-700 p-8 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700/50 text-center">
+          <div className="w-16 h-16 bg-[#E9D5FF]/50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#6D28D9]">
+            <Book className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-[#1F2937] dark:text-gray-100 mb-2">Private Journal</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 leading-relaxed">
+            The Diary is a private, personal archive. Please sign in or create an account to start writing and reading your own reflections.
+          </p>
+          <a
+            href="/admin"
+            className="inline-block w-full py-3 bg-[#6D28D9] text-white rounded-lg font-medium hover:bg-[#4C1D95] transition-colors shadow-md text-sm"
+          >
+            Sign In / Register
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-grow bg-transparent py-16 px-4">
