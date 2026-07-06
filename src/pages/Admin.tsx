@@ -765,7 +765,7 @@ function SubscribersTab({ onAction }: { onAction?: () => void }) {
 export function Admin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginMethod] = useState<'supabase' | 'local'>('local');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -774,29 +774,33 @@ export function Admin() {
 
   const [counts, setCounts] = useState({ poems: 0, diaryEntries: 0, verses: 0, affirmations: 0, messages: 0, subscribers: 0 });
 
-  // Auto sign in if passcode exists locally
+  // Listen to Supabase Auth state changes
   useEffect(() => {
-    const cachedPasscode = localStorage.getItem('anjy_passcode');
-    const cachedMethod = localStorage.getItem('anjy_login_method');
-    if (cachedMethod === 'local' && cachedPasscode) {
-      // Verify cached passcode with backend
-      fetch('/api/admin/verify_passcode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode: cachedPasscode })
-      })
-      .then(res => {
-        if (res.ok) {
+    const checkUser = async () => {
+      if (!supabase) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        localStorage.setItem('anjy_login_method', 'supabase');
+        localStorage.setItem('anjy_user_email', session.user.email || '');
+        setIsAuthenticated(true);
+      }
+    };
+    
+    if (supabase) {
+      checkUser();
+      
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          localStorage.setItem('anjy_login_method', 'supabase');
+          localStorage.setItem('anjy_user_email', session.user.email || '');
           setIsAuthenticated(true);
         } else {
-          localStorage.removeItem('anjy_passcode');
           localStorage.removeItem('anjy_login_method');
+          localStorage.removeItem('anjy_user_email');
+          setIsAuthenticated(false);
         }
-      })
-      .catch(() => {
-        // Offline support: if server is unreachable, trust local cached session
-        setIsAuthenticated(true);
       });
+      return () => subscription.unsubscribe();
     }
   }, []);
 
@@ -833,37 +837,55 @@ export function Admin() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/admin/verify_passcode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode: password })
+      if (!supabase) throw new Error('Supabase is not configured.');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      const resData = await response.json();
-      if (response.ok && resData.success) {
-        localStorage.setItem('anjy_login_method', 'local');
-        localStorage.setItem('anjy_passcode', password);
+      if (error) throw error;
+      if (data.user) {
+        localStorage.setItem('anjy_login_method', 'supabase');
+        localStorage.setItem('anjy_user_email', data.user.email || '');
         setIsAuthenticated(true);
-      } else {
-        setAuthError(resData.error || 'Invalid passcode.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
-      // Offline fallback: if connection fails, allow default 'admin123'
-      if (password === 'admin123') {
-        localStorage.setItem('anjy_login_method', 'local');
-        localStorage.setItem('anjy_passcode', password);
-        setIsAuthenticated(true);
-      } else {
-        setAuthError('Connection failed and passcode is incorrect.');
+      setAuthError(err.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setLoading(true);
+
+    try {
+      if (!supabase) throw new Error('Supabase is not configured.');
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) throw error;
+      if (data.user) {
+        alert('Registration successful! Please check your email for a confirmation link (if enabled) or sign in.');
+        setAuthMode('signin');
       }
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      setAuthError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     localStorage.removeItem('anjy_login_method');
-    localStorage.removeItem('anjy_passcode');
+    localStorage.removeItem('anjy_user_email');
     setIsAuthenticated(false);
     setEmail('');
     setPassword('');
@@ -877,8 +899,28 @@ export function Admin() {
           <div className="w-16 h-16 bg-[#E9D5FF]/50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#6D28D9]">
             <Lock className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-[#1F2937] dark:text-gray-100 mb-2 text-center">Admin Access</h1>
-          <p className="text-gray-500 text-sm mb-6 text-center">Please enter passcode to manage ANJY.</p>
+          <h1 className="text-2xl font-bold text-[#1F2937] dark:text-gray-100 mb-2 text-center">
+            {authMode === 'signin' ? 'Sign In to ANJY' : 'Create Account'}
+          </h1>
+          <p className="text-gray-500 text-sm mb-6 text-center">
+            {authMode === 'signin' ? 'Access your private journal space.' : 'Sign up to start your private journal.'}
+          </p>
+
+          {/* Tab Selector */}
+          <div className="flex border-b border-gray-100 dark:border-gray-700 mb-6">
+            <button
+              onClick={() => { setAuthMode('signin'); setAuthError(''); }}
+              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signin' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signup' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+              Register
+            </button>
+          </div>
 
           {authError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg mb-4 flex items-center gap-1.5 font-medium leading-relaxed">
@@ -887,14 +929,28 @@ export function Admin() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={authMode === 'signin' ? handleLogin : handleSignUp} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">
-                Admin Passcode
+                Email Address
+              </label>
+              <input 
+                type="email" 
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Password
               </label>
               <input 
                 type="password" 
-                placeholder="Enter admin passcode"
+                placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#6D28D9] text-sm"
@@ -907,7 +963,7 @@ export function Admin() {
               disabled={loading}
               className="w-full py-3 bg-[#6D28D9] text-white rounded-lg font-medium hover:bg-[#4C1D95] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-md"
             >
-              {loading ? 'Signing In...' : <><Key className="w-4 h-4" /> Sign In</>}
+              {loading ? 'Processing...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
         </div>
@@ -932,7 +988,7 @@ export function Admin() {
       case 'AI Assistant':
         return <AIChatTab />;
       case 'Backups & Exporters':
-        return <BackupTab isLocalMode={loginMethod === 'local'} />;
+        return <BackupTab isLocalMode={localStorage.getItem('anjy_login_method') !== 'supabase'} />;
       default:
         return (
           <>
@@ -966,13 +1022,13 @@ export function Admin() {
               </div>
             </div>
             
-            {loginMethod === 'local' && (
+            {localStorage.getItem('anjy_login_method') !== 'supabase' && (
               <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/50 text-purple-900 dark:text-purple-200 rounded-xl text-sm leading-relaxed">
                 <h3 className="font-semibold mb-1 flex items-center gap-1.5">
                   <ShieldAlert className="w-4 h-4 text-purple-600" /> Currently in Local Storage Mode
                 </h3>
                 <p className="opacity-90">
-                  You logged in using the passcode `admin123`. All posts and creations will be stored locally in this browser. To save to a central database, make sure you configure your Supabase variables and log in using **Supabase Auth**.
+                  You are currently in Offline Local Storage Mode. All posts and creations will be stored locally in this browser. To save to your secure account online, sign in with your email and password.
                 </p>
               </div>
             )}
@@ -999,7 +1055,7 @@ export function Admin() {
           <div className="flex flex-col">
             <h1 className="text-3xl font-bold text-[#4C1D95] dark:text-purple-400">CMS Dashboard</h1>
             <span className="text-xs text-gray-400 font-semibold mt-1">
-              Mode: {loginMethod === 'supabase' ? 'Online Supabase Database' : 'Offline Browser Local Storage'}
+              Mode: {localStorage.getItem('anjy_login_method') === 'supabase' ? 'Online Supabase Database' : 'Offline Browser Local Storage'}
             </span>
           </div>
           <button 

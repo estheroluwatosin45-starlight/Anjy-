@@ -2,7 +2,7 @@
 create extension if not exists "uuid-ossp";
 
 -- Profiles table
-create table profiles (
+create table if not exists profiles (
   id uuid references auth.users on delete cascade not null primary key,
   full_name text,
   email text,
@@ -12,8 +12,9 @@ create table profiles (
 );
 
 -- Poems table
-create table poems (
+create table if not exists poems (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade default auth.uid() not null,
   title text not null,
   slug text unique not null,
   content text not null,
@@ -22,8 +23,9 @@ create table poems (
 );
 
 -- Diary Entries table
-create table diary_entries (
+create table if not exists diary_entries (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade default auth.uid() not null,
   title text not null,
   slug text unique not null,
   content text not null,
@@ -32,27 +34,32 @@ create table diary_entries (
 );
 
 -- Bible Verses table
-create table bible_verses (
+create table if not exists bible_verses (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade default auth.uid() not null,
   verse_reference text not null,
   verse_text text not null,
   explanation text,
-  display_date date not null unique,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  display_date date not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_display_date unique (user_id, display_date)
 );
 
 -- Affirmations table
-create table affirmations (
+create table if not exists affirmations (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade default auth.uid() not null,
   title text not null,
   affirmation_text text not null,
-  display_date date not null unique,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  display_date date not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_affirmation_date unique (user_id, display_date)
 );
 
 -- Contact Messages table
-create table contact_messages (
+create table if not exists contact_messages (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade default auth.uid() not null, -- The author receiving the message
   name text not null,
   email text not null,
   message text not null,
@@ -60,15 +67,15 @@ create table contact_messages (
 );
 
 -- Newsletter Subscribers table
-create table newsletter_subscribers (
+create table if not exists newsletter_subscribers (
   id uuid default uuid_generate_v4() primary key,
-  email text unique not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  user_id uuid references auth.users on delete cascade default auth.uid() not null, -- The author receiving the subscriber
+  email text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_subscriber unique (user_id, email)
 );
 
--- Row Level Security (RLS) Policies
-
--- Enable RLS on all tables
+-- Enable Row Level Security (RLS)
 alter table profiles enable row level security;
 alter table poems enable row level security;
 alter table diary_entries enable row level security;
@@ -77,44 +84,26 @@ alter table affirmations enable row level security;
 alter table contact_messages enable row level security;
 alter table newsletter_subscribers enable row level security;
 
--- Public can read content
-create policy "Public can view poems" on poems for select using (true);
-create policy "Public can view diary entries" on diary_entries for select using (true);
-create policy "Public can view bible verses" on bible_verses for select using (true);
-create policy "Public can view affirmations" on affirmations for select using (true);
+-- Profiles policies
+create policy "Users can view any profile" on profiles for select using (true);
+create policy "Users can edit their own profile" on profiles for all using (auth.uid() = id);
 
--- Authenticated users (Admin) can manage content
-create policy "Admin can insert poems" on poems for insert with check (auth.role() = 'authenticated');
-create policy "Admin can update poems" on poems for update using (auth.role() = 'authenticated');
-create policy "Admin can delete poems" on poems for delete using (auth.role() = 'authenticated');
+-- Poems policies
+create policy "Users can access their own poems" on poems for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create policy "Admin can insert diary entries" on diary_entries for insert with check (auth.role() = 'authenticated');
-create policy "Admin can update diary entries" on diary_entries for update using (auth.role() = 'authenticated');
-create policy "Admin can delete diary entries" on diary_entries for delete using (auth.role() = 'authenticated');
+-- Diary Entries policies
+create policy "Users can access their own diary entries" on diary_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create policy "Admin can insert bible verses" on bible_verses for insert with check (auth.role() = 'authenticated');
-create policy "Admin can update bible verses" on bible_verses for update using (auth.role() = 'authenticated');
-create policy "Admin can delete bible verses" on bible_verses for delete using (auth.role() = 'authenticated');
+-- Bible Verses policies
+create policy "Users can access their own bible verses" on bible_verses for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create policy "Admin can insert affirmations" on affirmations for insert with check (auth.role() = 'authenticated');
-create policy "Admin can update affirmations" on affirmations for update using (auth.role() = 'authenticated');
-create policy "Admin can delete affirmations" on affirmations for delete using (auth.role() = 'authenticated');
+-- Affirmations policies
+create policy "Users can access their own affirmations" on affirmations for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- NOTE: If you are not using Supabase Auth (e.g. logging in only via the local "admin123" passcode),
--- you can enable public inserts for simplicity by running these alternative policies in the Supabase SQL editor:
---
--- create policy "Public can insert poems" on poems for insert with check (true);
--- create policy "Public can insert diary entries" on diary_entries for insert with check (true);
--- create policy "Public can insert bible verses" on bible_verses for insert with check (true);
--- create policy "Public can insert affirmations" on affirmations for insert with check (true);
+-- Contact Messages policies
+create policy "Public can submit contact messages" on contact_messages for insert with check (true);
+create policy "Users can access messages sent to them" on contact_messages for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Anyone can submit contact messages and subscribe to newsletter
-create policy "Public can insert contact messages" on contact_messages for insert with check (true);
-create policy "Public can insert newsletter subscribers" on newsletter_subscribers for insert with check (true);
-
--- Authenticated users (Admin) can view and manage contact messages and subscribers
-create policy "Admin can view contact messages" on contact_messages for select using (auth.role() = 'authenticated');
-create policy "Admin can delete contact messages" on contact_messages for delete using (auth.role() = 'authenticated');
-
-create policy "Admin can view newsletter subscribers" on newsletter_subscribers for select using (auth.role() = 'authenticated');
-create policy "Admin can delete newsletter subscribers" on newsletter_subscribers for delete using (auth.role() = 'authenticated');
+-- Newsletter Subscribers policies
+create policy "Public can subscribe to newsletter" on newsletter_subscribers for insert with check (true);
+create policy "Users can access their own subscribers list" on newsletter_subscribers for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

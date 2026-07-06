@@ -19,16 +19,21 @@ function generateUUID() {
   });
 }
 
+function getStorageKey(baseKey: string): string {
+  const email = localStorage.getItem('anjy_user_email') || 'anonymous';
+  return `${baseKey}_${email}`;
+}
+
 // Generic LocalStorage helpers
 export function getLocal<T>(key: string): T[] {
-  const data = localStorage.getItem(key);
+  const data = localStorage.getItem(getStorageKey(key));
   return data ? JSON.parse(data) : [];
 }
 
 function saveLocal<T>(key: string, item: T): T {
   const list = getLocal<T>(key);
   list.unshift(item); // Add to the beginning so it shows first (descending order)
-  localStorage.setItem(key, JSON.stringify(list));
+  localStorage.setItem(getStorageKey(key), JSON.stringify(list));
   return item;
 }
 
