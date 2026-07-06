@@ -5,9 +5,15 @@ export function About() {
     <div className="flex-grow bg-white dark:bg-gray-800 dark:border-gray-700 py-20 px-4">
       <div className="max-w-3xl mx-auto prose prose-purple prose-lg">
         <h1 className="text-4xl font-bold text-[#4C1D95] mb-8 text-center">About ANJY</h1>
-        <div className="w-full aspect-video bg-[#E9D5FF]/30 rounded-2xl mb-12 overflow-hidden flex items-center justify-center text-[#6D28D9]">
-            {/* Placeholder for author image */}
-            <span className="font-semibold text-xl opacity-50">Author Profile Image</span>
+        <div className="flex justify-center mb-12">
+          <div className="relative group max-w-sm w-full overflow-hidden rounded-2xl shadow-md border border-purple-100 dark:border-gray-700">
+            <img 
+              src="/author.png" 
+              alt="Anjy" 
+              className="w-full object-cover aspect-[3/4] group-hover:scale-[1.02] transition-transform duration-300"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-purple-950/20 to-transparent pointer-events-none"></div>
+          </div>
         </div>
         <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
           Welcome to ANJY, a sanctuary dedicated to the exploration of life, faith, and the human experience through words. This platform serves as a personal archive of poetry, daily diary reflections, scriptural insights, and empowering affirmations.

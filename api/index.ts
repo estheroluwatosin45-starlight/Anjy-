@@ -130,26 +130,64 @@ app.post('/api/backup', async (req, res) => {
       supabase.from('affirmations').select('*'),
     ]);
 
+    const backupData = {
+      poems: poemsResult.data || [],
+      diaryEntries: diaryResult.data || [],
+      bibleVerses: versesResult.data || [],
+      affirmations: affirmationsResult.data || [],
+      backup_timestamp: new Date().toISOString()
+    };
+
+    const totalItems = backupData.poems.length + backupData.diaryEntries.length + backupData.bibleVerses.length + backupData.affirmations.length;
+
+    let summaryCardHtml = '';
+    if (totalItems === 0) {
+      summaryCardHtml = `
+        <div style="background-color: #f3f4f6; border: 1px dashed #d1d5db; border-radius: 8px; padding: 20px; text-align: center; color: #6b7280; margin: 20px 0;">
+          <p style="margin: 0; font-size: 16px; font-weight: 500;">Your database is currently empty!</p>
+          <p style="margin: 5px 0 0 0; font-size: 14px;">Once you add poems, diary entries, scriptures, or affirmations in your Admin panel, they will appear here and in your JSON attachment.</p>
+        </div>
+      `;
+    } else {
+      summaryCardHtml = `
+        <div style="background-color: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 15px; margin: 20px 0; color: #5b21b6; font-family: sans-serif;">
+          <p style="margin: 0; font-size: 14px; font-weight: 600;">Backup Summary:</p>
+          <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 13px;">
+            <li>Poems: ${backupData.poems.length}</li>
+            <li>Diary Entries: ${backupData.diaryEntries.length}</li>
+            <li>Daily Bible Verses: ${backupData.bibleVerses.length}</li>
+            <li>Affirmations: ${backupData.affirmations.length}</li>
+          </ul>
+        </div>
+      `;
+    }
+
     const formatItems = (items: any[], title: string, contentKey: string) => {
       if (!items || items.length === 0) return '';
-      return `<h2>${title}</h2>` + items.map(item => `
-        <div style="border-bottom: 1px solid #ccc; padding: 10px 0; margin-bottom: 10px;">
-          <h3>${item.title || item.verse_reference || 'Entry'}</h3>
-          <p style="white-space: pre-wrap;">${item[contentKey] || ''}</p>
-          <small style="color: #666;">${item.created_at || item.display_date || ''}</small>
+      return `<h2 style="color: #4C1D95; border-bottom: 2px solid #ddd6fe; padding-bottom: 5px; margin-top: 25px;">${title}</h2>` + items.map(item => `
+        <div style="border-bottom: 1px solid #f3f4f6; padding: 12px 0; margin-bottom: 12px;">
+          <h3 style="margin: 0 0 5px 0; color: #1f2937;">${item.title || item.verse_reference || 'Entry'}</h3>
+          <p style="white-space: pre-wrap; margin: 0 0 5px 0; color: #4b5563; font-size: 14px; line-height: 1.5;">${item[contentKey] || ''}</p>
+          <small style="color: #9ca3af; font-size: 11px;">${item.created_at || item.display_date || ''}</small>
         </div>
       `).join('');
     };
 
     const htmlContent = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-        <h1 style="color: #6D28D9;">ANJY Backup</h1>
-        <p>Here is the requested backup of your database content.</p>
-        <hr />
-        ${formatItems(poemsResult.data || [], 'Poems', 'content')}
-        ${formatItems(diaryResult.data || [], 'Diary Entries', 'content')}
-        ${formatItems(versesResult.data || [], 'Bible Verses', 'verse_text')}
-        ${formatItems(affirmationsResult.data || [], 'Affirmations', 'affirmation_text')}
+        <h1 style="color: #6D28D9; margin-bottom: 5px;">ANJY Backup</h1>
+        <p style="margin: 0; color: #6b7280;">Here is the requested backup of your database content.</p>
+        
+        ${summaryCardHtml}
+        
+        <p style="font-size: 13px; color: #6b7280; margin-bottom: 20px;">
+          Note: We have also attached a complete <strong>.json</strong> backup file to this email which you can keep for safe keeping or import back into the app later.
+        </p>
+        
+        ${formatItems(backupData.poems, 'Poems', 'content')}
+        ${formatItems(backupData.diaryEntries, 'Diary Entries', 'content')}
+        ${formatItems(backupData.bibleVerses, 'Bible Verses', 'verse_text')}
+        ${formatItems(backupData.affirmations, 'Affirmations', 'affirmation_text')}
       </div>
     `;
 
@@ -157,7 +195,14 @@ app.post('/api/backup', async (req, res) => {
       from: 'ANJY Backup <onboarding@resend.dev>',
       to: email,
       subject: 'Your ANJY Content Backup',
-      html: htmlContent
+      html: htmlContent,
+      attachments: [
+        {
+          filename: `anjy_backup_${new Date().toISOString().split('T')[0]}.json`,
+          content: Buffer.from(JSON.stringify(backupData, null, 2)).toString('base64'),
+          contentType: 'application/json'
+        }
+      ]
     });
 
     if (error) {
