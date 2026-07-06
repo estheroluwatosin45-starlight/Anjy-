@@ -553,6 +553,73 @@ app.post('/api/admin/broadcast', verifyAdmin, async (req, res) => {
   }
 });
 
+// Retrieve or Auto-Generate Daily Bible Verse
+app.get('/api/verses/today', async (req, res) => {
+  try {
+    if (!supabase) return res.status(503).json({ error: 'Supabase is not configured' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Check if a verse already exists for today
+    const { data: existingVerse, error: fetchError } = await supabase
+      .from('bible_verses')
+      .select('*')
+      .eq('display_date', todayStr)
+      .eq('is_private', false)
+      .limit(1);
+
+    if (existingVerse && existingVerse.length > 0) {
+      return res.json(existingVerse[0]);
+    }
+
+    // 2. No verse found. Let's auto-generate one using Gemini!
+    console.log(`[Daily Verse System] No verse found for ${todayStr}. Generating via Gemini...`);
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: `Provide a daily Bible verse for today (${todayStr}). Pick a popular, inspiring verse. Format your response exactly as JSON: {"verse_reference": "Book Chapter:Verse", "verse_text": "The actual verse text...", "explanation": "A short, one sentence explanation of its meaning and how to apply it."}. Do not include markdown blocks, just return the JSON object.`,
+    });
+
+    let result = response.text || '{}';
+    result = result.replace(/```json/g, '').replace(/```/g, '').trim();
+    const verseData = JSON.parse(result);
+
+    // 3. Save it to the database under the owner's user_id so it is cached for the rest of today!
+    const ownerId = await getOwnerUserId();
+    if (ownerId) {
+      const { data: insertedVerse, error: insertError } = await supabase
+        .from('bible_verses')
+        .insert([{
+          verse_reference: verseData.verse_reference,
+          verse_text: verseData.verse_text,
+          explanation: verseData.explanation,
+          display_date: todayStr,
+          user_id: ownerId,
+          is_private: false
+        }])
+        .select()
+        .single();
+
+      if (!insertError && insertedVerse) {
+        return res.json(insertedVerse);
+      } else {
+        console.error('Error inserting generated verse:', insertError);
+      }
+    }
+
+    // Fallback: return the generated data directly if we couldn't insert
+    res.json({
+      id: 'generated',
+      verse_reference: verseData.verse_reference,
+      verse_text: verseData.verse_text,
+      explanation: verseData.explanation,
+      display_date: todayStr
+    });
+  } catch (error: any) {
+    console.error('Error in daily verse service:', error);
+    res.status(500).json({ error: 'Failed to retrieve daily verse' });
+  }
+});
+
 // --- Server Startup or Export ---
 
 export default app;

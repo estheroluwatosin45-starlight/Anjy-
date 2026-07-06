@@ -12,6 +12,31 @@ export function BibleVerses() {
     async function fetchVerses() {
       try {
         const data = await getBibleVerses();
+        
+        // Check if today's verse is already in the database
+        const todayStr = new Date().toISOString().split('T')[0];
+        const hasTodayVerse = data.some(v => {
+          if (!v.display_date) return false;
+          // Extract just the date part if it is a full ISO timestamp
+          const vDateStr = v.display_date.includes('T') ? v.display_date.split('T')[0] : v.display_date;
+          return vDateStr === todayStr;
+        });
+
+        if (!hasTodayVerse) {
+          try {
+            const todayRes = await fetch('/api/verses/today');
+            if (todayRes.ok) {
+              const todayVerse = await todayRes.json();
+              if (todayVerse && todayVerse.verse_text) {
+                setVerses([todayVerse, ...data]);
+                return;
+              }
+            }
+          } catch (apiErr) {
+            console.warn('Could not fetch automated daily verse fallback:', apiErr);
+          }
+        }
+        
         setVerses(data);
       } catch (error) {
         console.error('Error fetching bible verses:', error);
