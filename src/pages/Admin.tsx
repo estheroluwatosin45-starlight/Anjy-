@@ -762,10 +762,12 @@ function SubscribersTab({ onAction }: { onAction?: () => void }) {
   );
 }
 
-export function Admin() {
+export function Admin({ passcodeOnly = false }: { passcodeOnly?: boolean }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'passcode' | 'signin' | 'signup'>('passcode');
+  const [authMode, setAuthMode] = useState<'passcode' | 'signin' | 'signup'>(
+    passcodeOnly ? 'passcode' : 'signin'
+  );
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -975,27 +977,23 @@ export function Admin() {
             {authMode === 'passcode' ? 'Enter passcode to manage website.' : authMode === 'signin' ? 'Access your private journal space.' : 'Sign up to start your private journal.'}
           </p>
 
-          {/* Tab Selector */}
-          <div className="flex border-b border-gray-100 dark:border-gray-700 mb-6">
-            <button
-              onClick={() => { setAuthMode('passcode'); setAuthError(''); }}
-              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'passcode' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-              Passcode
-            </button>
-            <button
-              onClick={() => { setAuthMode('signin'); setAuthError(''); }}
-              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signin' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setAuthMode('signup'); setAuthError(''); }}
-              className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signup' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-              Register
-            </button>
-          </div>
+          {/* Tab Selector - only render if passcodeOnly is false */}
+          {!passcodeOnly && (
+            <div className="flex border-b border-gray-100 dark:border-gray-700 mb-6">
+              <button
+                onClick={() => { setAuthMode('signin'); setAuthError(''); }}
+                className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signin' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+                className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-colors ${authMode === 'signup' ? 'border-[#6D28D9] text-[#6D28D9]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+              >
+                Register
+              </button>
+            </div>
+          )}
 
           {authError && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg mb-4 flex items-center gap-1.5 font-medium leading-relaxed">

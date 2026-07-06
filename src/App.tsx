@@ -26,7 +26,8 @@ export default function App() {
           <Route path="affirmations" element={<Affirmations />} />
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
-          <Route path="admin" element={<Admin />} />
+          <Route path="admin" element={<Admin passcodeOnly={false} />} />
+          <Route path="owner-login" element={<Admin passcodeOnly={true} />} />
         </Route>
       </Routes>
     </BrowserRouter>

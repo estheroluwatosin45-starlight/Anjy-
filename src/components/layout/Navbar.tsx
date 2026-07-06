@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router';
 import { Book, Heart, Feather, BookOpen, User, Shield, Search, Moon, Sun } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 const ButterflyIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -24,12 +25,29 @@ const ButterflyIcon = ({ className }: { className?: string }) => (
 export function Navbar() {
   const location = useLocation();
   const [isDark, setIsDark] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     // Check initial dark mode preference
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
       setIsDark(true);
+    }
+
+    // Check initial auth state
+    setIsLoggedIn(localStorage.getItem('anjy_login_method') === 'supabase');
+
+    if (supabase) {
+      const checkUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsLoggedIn(!!session?.user);
+      };
+      checkUser();
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setIsLoggedIn(!!session?.user);
+      });
+      return () => subscription.unsubscribe();
     }
   }, []);
 
@@ -125,8 +143,17 @@ export function Navbar() {
             to="/admin" 
             className="bg-gradient-to-r from-[#d946ef] to-[#a855f7] hover:from-[#e879f9] hover:to-[#c084fc] text-white px-3 md:px-5 py-1.5 md:py-2.5 rounded-full flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs xl:text-sm font-semibold transition-all shadow-[0_4px_15px_rgba(217,70,239,0.3)] dark:shadow-[0_0_15px_rgba(217,70,239,0.4)] ml-1 shrink-0"
           >
-            <Shield className="w-3 h-3 md:w-4 md:h-4 shrink-0" />
-            <span className="whitespace-nowrap">Admin</span>
+            {isLoggedIn ? (
+              <>
+                <Shield className="w-3 h-3 md:w-4 md:h-4 shrink-0" />
+                <span className="whitespace-nowrap">Dashboard</span>
+              </>
+            ) : (
+              <>
+                <User className="w-3 h-3 md:w-4 md:h-4 shrink-0" />
+                <span className="whitespace-nowrap">Sign In</span>
+              </>
+            )}
           </Link>
         </div>
       </div>
