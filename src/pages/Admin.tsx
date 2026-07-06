@@ -1012,14 +1012,18 @@ export function Admin() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Affirmations</p>
                 <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.affirmations}</p>
               </div>
-              <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Inbox Messages</p>
-                <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.messages}</p>
-              </div>
-              <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Subscribers</p>
-                <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.subscribers}</p>
-              </div>
+              {isAdmin && (
+                <>
+                  <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Inbox Messages</p>
+                    <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.messages}</p>
+                  </div>
+                  <div className="p-5 border border-gray-100 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-900/50 shadow-sm">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">Subscribers</p>
+                    <p className="text-3xl font-extrabold text-[#6D28D9]">{counts.subscribers}</p>
+                  </div>
+                </>
+              )}
             </div>
             
             {localStorage.getItem('anjy_login_method') !== 'supabase' && (
@@ -1048,6 +1052,12 @@ export function Admin() {
     }
   };
 
+  const currentUserEmail = localStorage.getItem('anjy_user_email') || '';
+  const isAdmin = currentUserEmail === 'pipeloluwadavid@gmail.com' || currentUserEmail === 'anjy@gmail.com' || currentUserEmail === 'estheroluwatosin45@gmail.com';
+  
+  const allTabs = ['Dashboard', 'Poems', 'Diary Entries', 'Bible Verses', 'Affirmations', 'Inbox', 'Subscribers', 'AI Assistant', 'Backups & Exporters'];
+  const tabs = isAdmin ? allTabs : ['Dashboard', 'Poems', 'Diary Entries', 'Bible Verses', 'Affirmations', 'AI Assistant', 'Backups & Exporters'];
+
   return (
     <div className="flex-grow bg-transparent py-12 px-4">
       <div className="max-w-6xl mx-auto">
@@ -1068,7 +1078,7 @@ export function Admin() {
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1 space-y-2">
-            {['Dashboard', 'Poems', 'Diary Entries', 'Bible Verses', 'Affirmations', 'Inbox', 'Subscribers', 'AI Assistant', 'Backups & Exporters'].map((tab) => (
+            {tabs.map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
