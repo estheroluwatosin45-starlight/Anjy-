@@ -9,5 +9,11 @@
       "source": "/:path*",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/verses/today",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
